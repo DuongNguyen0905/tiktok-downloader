@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CAS TikTok Downloader</title>
+<style>
+  :root {
+    --bg: #0f1115; --bg-elev: #171a22; --bg-elev-2: #1f2430;
+    --text: #eceef2; --text-dim: #9aa1b1; --accent: #ff2d55; --accent-2: #25f4ee;
+    --border: #2a2f3d; --radius: 12px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin:0; padding:0; background:var(--bg); color:var(--text); font-family:"Segoe UI",Roboto,Arial,sans-serif; min-height:100vh; }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 32px 20px 60px; }
+  h1 { font-size: 24px; text-align:center; margin-bottom: 4px; }
+  .sub { text-align:center; color: var(--text-dim); font-size: 13px; margin-bottom: 28px; }
+  .form-row { display:flex; gap:8px; margin-bottom: 8px; }
+  input[type=text] {
+    flex:1; padding: 14px 16px; border-radius: var(--radius); border:1px solid var(--border);
+    background: var(--bg-elev); color: var(--text); font-size: 14px; outline:none;
+  }
+  input[type=text]:focus { border-color: var(--accent); }
+  button { cursor:pointer; border:none; font-weight:600; }
+  .btn-primary {
+    padding: 14px 22px; border-radius: var(--radius);
+    background: linear-gradient(135deg, var(--accent), #ff5e7a); color:#fff; font-size:14px;
+  }
+  .btn-primary:disabled { opacity:0.6; cursor:not-allowed; }
+  .btn-paste {
+    padding: 14px 16px; border-radius: var(--radius);
+    background: var(--bg-elev-2); color:var(--text); border:1px solid var(--border); font-size:14px;
+  }
+  .btn-paste:hover { border-color: var(--accent-2); }
+  .type-badge {
+    display:inline-block; font-size:11px; font-weight:700; padding:3px 10px; border-radius:12px;
+    background: var(--bg-elev-2); color: var(--accent-2); margin-bottom:10px; letter-spacing:.3px;
+  }
+  .notice { font-size:12px; color:var(--text-dim); line-height:1.6; background:var(--bg-elev); border:1px solid var(--border); border-radius:var(--radius); padding:12px 14px; margin-bottom:24px; }
+  .status { text-align:center; padding: 20px; color: var(--text-dim); font-size:14px; }
+  .status.error { color: #ff6b6b; }
+  .result-card { background: var(--bg-elev); border:1px solid var(--border); border-radius: var(--radius); padding:18px; margin-top: 10px; }
+  .result-head { display:flex; align-items:center; gap:10px; margin-bottom:14px; }
+  .result-head img { width:40px; height:40px; border-radius:50%; object-fit:cover; background:var(--bg-elev-2); }
+  .result-head .name { font-weight:600; font-size:14px; }
+  .result-head .desc { font-size:12px; color:var(--text-dim); margin-top:2px; }
+  video { width:100%; border-radius:8px; background:#000; display:block; margin-bottom:14px; }
+  .img-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:10px; margin-bottom:14px; }
+  .img-grid img { width:100%; border-radius:8px; display:block; }
+  .dl-row { display:flex; gap:10px; flex-wrap:wrap; }
+  .btn-dl {
+    flex:1; min-width:160px; text-align:center; padding:12px 16px; border-radius:8px;
+    background: var(--bg-elev-2); color:var(--text); border:1px solid var(--border); font-size:13px; text-decoration:none; display:block;
+  }
+  .btn-dl:hover { border-color: var(--accent-2); }
+  .btn-dl.primary { background: var(--accent); border-color: var(--accent); color:#fff; }
+  footer { text-align:center; font-size:11px; color:var(--text-dim); margin-top:30px; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>🎵 CAS TikTok Downloader</h1>
+    <div class="sub">Tải video / ảnh TikTok không watermark</div>
+
+    <div class="notice">
+      ⚠️ Chỉ dùng để tải nội dung bạn sở hữu hoặc được phép lưu lại cho mục đích cá nhân
+      (xem lại video của chính bạn, lưu offline...). Vui lòng tôn trọng bản quyền và ghi công
+      tác giả gốc nếu chia sẻ lại, không dùng công cụ này để đăng lại nội dung của người khác
+      như của mình.
+    </div>
+
+    <div class="form-row">
+      <input type="text" id="url-input" placeholder="Dán link TikTok vào đây (video/ảnh, copy từ điện thoại hay laptop đều được)..." />
+      <button class="btn-paste" id="paste-btn" title="Dán từ clipboard">📋 Dán</button>
+      <button class="btn-primary" id="fetch-btn">Lấy về</button>
+    </div>
+    <div class="sub" style="margin:-2px 0 20px;text-align:left">
+      Hỗ trợ: link đầy đủ (tiktok.com/@user/video/..., .../photo/...), link rút gọn (vt.tiktok.com, vm.tiktok.com),
+      kể cả khi dán nguyên đoạn chia sẻ có kèm caption từ app TikTok trên điện thoại.
+    </div>
+
+    <div id="output"></div>
+
+    <footer>CAS TikTok Downloader · demo cá nhân, không lưu trữ nội dung trên server.</footer>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

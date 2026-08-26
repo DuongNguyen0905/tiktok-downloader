@@ -1,0 +1,22 @@
+{
+  "name": "tiktok-downloader",
+  "version": "1.0.0",
+  "description": "Web tai video/anh/Live Photo TikTok khong watermark - dung ca nhan",
+  "main": "server.js",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@tobyg74/tiktok-api-dl": "^1.3.7",
+    "axios": "^1.19.0",
+    "express": "^5.2.1"
+  }
+}
