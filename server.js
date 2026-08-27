@@ -5,13 +5,40 @@
 const express = require("express");
 const path = require("path");
 const axios = require("axios");
+const rateLimit = require("express-rate-limit");
 const Tiktok = require("@tobyg74/tiktok-api-dl");
 
 const app = express();
+
+// Render dung reverse proxy phia truoc app. Neu khong bat trust proxy, moi nguoi
+// dung se bi tinh chung 1 IP (IP cua proxy noi bo) -> rate limit se gioi han
+// nham CA SERVER thay vi tung nguoi dung rieng le. Chi tin header cua 1 hop proxy
+// dau tien (dung voi Render), khong tin toan bo chuoi X-Forwarded-For tu client.
+app.set("trust proxy", 1);
+
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
 
 const PORT = process.env.PORT || 3001;
+
+// Chan lam dung/bot goi lien tuc lam qua tai server free-tier (0.1 CPU, 512MB RAM)
+// va lam ton bang thong mien phi khi proxy tai file. Gioi han rong rai, khong anh
+// huong nguoi dung binh thuong (moi nguoi thuong chi fetch vai lan/tai vai file).
+const fetchLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  limit: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Bạn thao tác hơi nhanh, vui lòng đợi vài phút rồi thử lại." },
+});
+
+const downloadLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  limit: 40, // cao hon fetch vi 1 video co the co nhieu file (video + nhac + anh bia + nhieu anh slideshow)
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Bạn tải hơi nhanh, vui lòng đợi vài phút rồi thử lại." },
+});
 
 // Cac domain CDN hop le duoc phep proxy tai ve (chan dung endpoint nay lam open proxy).
 const ALLOWED_HOST_PATTERNS = [
@@ -196,7 +223,7 @@ function extractTiktokUrl(input) {
 }
 
 // Thu lan luot nhieu "engine" (v1 -> v3 -> v2) vi TikTok hay doi cau truc, engine nay hong thi dung engine khac.
-app.post("/api/fetch", async (req, res) => {
+app.post("/api/fetch", fetchLimiter, async (req, res) => {
   const { url: rawInput } = req.body || {};
   const url = extractTiktokUrl(rawInput);
   if (!url) {
@@ -269,7 +296,7 @@ app.post("/api/fetch", async (req, res) => {
 });
 
 // Proxy tai file ve may nguoi dung voi ten file dep + dung header Referer de qua duoc hotlink-protection cua CDN.
-app.get("/api/download", async (req, res) => {
+app.get("/api/download", downloadLimiter, async (req, res) => {
   const { src, name } = req.query;
   if (!src || !isAllowedHost(src)) {
     return res.status(400).json({ error: "URL nguon khong hop le." });
