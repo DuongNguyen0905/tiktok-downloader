@@ -61,19 +61,47 @@ function classifyKind(data) {
 }
 
 const KIND_META = {
-  video: { badge: "🎬 VIDEO", primaryLabel: "⬇ Tải video" },
-  livePhoto: { badge: "🎞️ LIVE PHOTO", primaryLabel: "⬇ Tải Live Photo" },
-  photo: { badge: "🖼️ ẢNH", primaryLabel: "⬇ Tải tất cả ảnh" },
+  video: { badge: "🎬 VIDEO" },
+  livePhoto: { badge: "🎞️ LIVE PHOTO" },
+  photo: { badge: "🖼️ ẢNH" },
 };
+
+// Dong dau tien cua ket qua: tong hop so anh + nut tai tat ca trong 1 lan bam.
+function summaryHtml(count, hint, btnLabel) {
+  return `<div class="media-summary">
+    <div class="count">📸 Tìm thấy ${count} ảnh<small>${hint}</small></div>
+    <button class="btn-dl primary" id="dl-all-images">${btnLabel}</button>
+  </div>`;
+}
+
+// Luoi anh: moi anh nam trong 1 the rieng, nut tai dat ngay duoi anh do.
+function imageGridHtml(images, safeName) {
+  return `<div class="img-grid">${images.map((src, i) => `
+    <div class="img-card">
+      <img src="${src}" loading="lazy" alt="Ảnh ${i + 1}"/>
+      <a class="btn-dl-sm" href="${dlUrl(src, safeName + "_" + (i + 1), "image")}">⬇ Tải ảnh ${i + 1}</a>
+    </div>`).join("")}</div>`;
+}
 
 function renderResult(data) {
   const safeName = (data.author.nickname || "tiktok").replace(/[^\w\-]/g, "_");
   const kind = classifyKind(data);
   const meta = KIND_META[kind];
+  const n = (data.images || []).length;
 
   let html = `<div class="result-card">
-    <div class="type-badge">${meta.badge}</div>
-    <div class="result-head">
+    <div class="type-badge">${meta.badge}</div>`;
+
+  // Voi noi dung dang anh, dat dong tong hop len tren cung cho de thay.
+  if ((kind === "photo" || kind === "livePhoto") && n) {
+    html += summaryHtml(
+      n,
+      "Bấm nút dưới mỗi ảnh để tải riêng, hoặc tải tất cả cùng lúc.",
+      `⬇ Tải tất cả ${n} ảnh`
+    );
+  }
+
+  html += `<div class="result-head">
       <img src="${data.author.avatar || ""}" alt="" onerror="this.style.display='none'"/>
       <div>
         <div class="name">${escapeHtml(data.author.nickname || "Không rõ tác giả")}</div>
@@ -85,7 +113,7 @@ function renderResult(data) {
     const previewSrc = data.videoNoWatermark || data.videoWatermark;
     html += `<video src="${previewSrc}" controls playsinline></video>
       <div class="dl-row">
-        <a class="btn-dl primary" href="${dlUrl(previewSrc, safeName + "_video", "video")}">${meta.primaryLabel}</a>
+        <a class="btn-dl primary" href="${dlUrl(previewSrc, safeName + "_video", "video")}">⬇ Tải video</a>
         ${data.videoWatermark ? `<a class="btn-dl" href="${dlUrl(data.videoWatermark, safeName + "_watermark", "video")}">⬇ Bản có watermark</a>` : ""}
         ${data.music ? `<a class="btn-dl" href="${dlUrl(data.music, safeName + "_audio", "audio")}">🎵 Nhạc nền</a>` : ""}
         ${data.coverStatic ? `<a class="btn-dl" href="${dlUrl(data.coverStatic, safeName + "_cover_static", "image")}">🖼 Ảnh bìa tĩnh</a>` : ""}
@@ -93,17 +121,18 @@ function renderResult(data) {
       </div>`;
   } else if (kind === "livePhoto") {
     html += `<video src="${data.videoNoWatermark}" controls playsinline loop></video>
-      <div class="img-grid">${data.images.map((src) => `<img src="${src}" loading="lazy"/>`).join("")}</div>
+      ${imageGridHtml(data.images, safeName)}
       <div class="dl-row">
-        <a class="btn-dl primary" href="${dlUrl(data.videoNoWatermark, safeName + "_live_photo", "video")}">${meta.primaryLabel}</a>
-        <button class="btn-dl" id="dl-all-images">🖼 Tải riêng từng ảnh tĩnh (${data.images.length})</button>
+        <a class="btn-dl primary" href="${dlUrl(data.videoNoWatermark, safeName + "_live_photo", "video")}">⬇ Tải Live Photo (bản động)</a>
+        ${data.music ? `<a class="btn-dl" href="${dlUrl(data.music, safeName + "_audio", "audio")}">🎵 Nhạc nền</a>` : ""}
       </div>`;
-  } else if (kind === "photo" && data.images.length) {
-    html += `<div class="img-grid">${data.images.map((src) => `<img src="${src}" loading="lazy"/>`).join("")}</div>
-      <div class="dl-row">
-        <button class="btn-dl primary" id="dl-all-images">${meta.primaryLabel} (${data.images.length})</button>
-        ${data.images.map((src, i) => `<a class="btn-dl" href="${dlUrl(src, safeName + "_" + (i + 1), "image")}">Ảnh ${i + 1}</a>`).join("")}
+  } else if (kind === "photo" && n) {
+    html += imageGridHtml(data.images, safeName);
+    if (data.music) {
+      html += `<div class="dl-row">
+        <a class="btn-dl" href="${dlUrl(data.music, safeName + "_audio", "audio")}">🎵 Nhạc nền</a>
       </div>`;
+    }
   } else {
     html += `<div class="status error">Không tìm thấy media để tải.</div>`;
   }
@@ -113,12 +142,15 @@ function renderResult(data) {
 
   const allBtn = document.getElementById("dl-all-images");
   if (allBtn) {
-    allBtn.addEventListener("click", () => downloadAllImages(data.images, safeName));
+    allBtn.addEventListener("click", () => downloadAllImages(data.images, safeName, allBtn));
   }
 }
 
 // Tai lan luot tung anh (co gian cach nho) de trinh duyet khong chan tai hang loat cung luc.
-function downloadAllImages(images, safeName) {
+function downloadAllImages(images, safeName, btn) {
+  const label = btn ? btn.textContent : "";
+  if (btn) { btn.disabled = true; btn.textContent = `⏳ Đang tải ${images.length} ảnh...`; }
+
   images.forEach((src, i) => {
     setTimeout(() => {
       const a = document.createElement("a");
@@ -127,6 +159,11 @@ function downloadAllImages(images, safeName) {
       document.body.appendChild(a);
       a.click();
       a.remove();
+
+      // Anh cuoi cung da gui xong -> tra nut ve trang thai binh thuong.
+      if (i === images.length - 1 && btn) {
+        setTimeout(() => { btn.disabled = false; btn.textContent = label; }, 600);
+      }
     }, i * 400);
   });
 }
