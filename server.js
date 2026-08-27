@@ -177,6 +177,13 @@ function normalize(raw, version) {
   return null;
 }
 
+// Endpoint sieu nhe danh cho dich vu ping ben ngoai (cron) goi dinh ky, giup
+// server tren goi free khong "ngu" -> nguoi dung khong phai doi ~50s khi vao trang.
+// Khong doc file, khong goi TikTok, chi tra ve 1 dong text.
+app.get("/healthz", (req, res) => {
+  res.type("text/plain").send("ok");
+});
+
 // Nguoi dung co the dan nguyen ca doan chia se tu app TikTok tren dien thoai
 // (vi du: "Xem video nay tren TikTok! https://vm.tiktok.com/ZM8abcxyz/ 07/25")
 // thay vi chi mot link sach tu thanh dia chi trinh duyet laptop -> tu tim link that trong doan text.
