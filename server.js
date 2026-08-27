@@ -33,6 +33,84 @@ function isAllowedHost(urlStr) {
   }
 }
 
+// URL nao mang dau hieu watermark cua TikTok thi loai bo (endpoint /aweme/v1/play/ co watermark=1).
+function hasWatermarkMark(url) {
+  return /watermark=1|logo_name=/i.test(url || "");
+}
+
+// Nhan de nguoi dung hieu: uu tien chieu nho (do phan giai dung nghia video doc).
+function qualityLabel(w, h) {
+  const shortSide = Math.min(w || 0, h || 0);
+  if (!shortSide) return "Khong ro";
+  return shortSide + "p";
+}
+
+// TikTok tra ve NHIEU muc chat luong o nhung field khac nhau. Ham nay quet het,
+// loai ban co watermark, roi sap xep de ban dep nhat (nhieu pixel nhat) len dau.
+// Luu y: download_addr bi bo qua - no la ban "tai ve" cua TikTok, thuong kem watermark.
+function extractVideoQualities(rawVideo) {
+  if (!rawVideo || typeof rawVideo !== "object") return [];
+  const out = [];
+
+  const push = (addr, source, codec) => {
+    if (!addr || !Array.isArray(addr.url_list)) return;
+    const url = addr.url_list.find((u) => u && !hasWatermarkMark(u));
+    if (!url) return;
+    out.push({
+      url,
+      width: addr.width || 0,
+      height: addr.height || 0,
+      size: addr.data_size || 0,
+      source,
+      codec: codec || "h264",
+    });
+  };
+
+  push(rawVideo.play_addr, "play_addr", "h264");
+  push(rawVideo.play_addr_h264, "play_addr_h264", "h264");
+  push(rawVideo.play_addr_bytevc1, "play_addr_bytevc1", "h265");
+  if (Array.isArray(rawVideo.bit_rate)) {
+    rawVideo.bit_rate.forEach((b, i) => {
+      if (!b) return;
+      push(b.play_addr, "bit_rate[" + i + "]" + (b.gear_name ? " " + b.gear_name : ""), b.is_bytevc1 ? "h265" : "h264");
+    });
+  }
+
+  // Bo ban trung nhau (cung do phan giai + cung dung luong).
+  const seen = new Set();
+  const uniq = out.filter((q) => {
+    const key = q.width + "x" + q.height + ":" + q.size;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  // Nhieu pixel truoc; cung do phan giai thi ban nang hon (it nen hon) truoc.
+  uniq.sort((a, b) => (b.width * b.height) - (a.width * a.height) || b.size - a.size);
+
+  return uniq.map((q) => ({
+    ...q,
+    label: qualityLabel(q.width, q.height),
+    // H.264 phat duoc tren moi may/phan mem; H.265 net hon o cung dung luong
+    // nhung may cu hoac Windows thieu HEVC extension co the khong mo duoc.
+    compatible: q.codec === "h264",
+  }));
+}
+
+// Anh trong bai slideshow: uu tien display_image (ban goc, khong watermark),
+// tranh cac field *watermark_image*.
+function extractImageUrls(rawContent) {
+  const imgs = rawContent && rawContent.image_post_info && rawContent.image_post_info.images;
+  if (!Array.isArray(imgs)) return [];
+  return imgs
+    .map((im) => {
+      const d = im && im.display_image;
+      if (!d || !Array.isArray(d.url_list)) return null;
+      return d.url_list.find((u) => u && !hasWatermarkMark(u)) || null;
+    })
+    .filter(Boolean);
+}
+
 // Chuan hoa response tu 3 phien ban khac nhau cua thu vien ve 1 dinh dang chung.
 // coverStatic = anh bia tinh (originCover), coverDynamic = anh bia dong/webp chuyen dong (dynamicCover).
 function normalize(raw, version) {
@@ -100,9 +178,53 @@ app.post("/api/fetch", async (req, res) => {
     return res.status(400).json({ error: "Khong tim thay link TikTok hop le trong noi dung ban dan vao." });
   }
 
-  const versions = ["v1", "v3", "v2"];
   let lastError = "";
-  for (const version of versions) {
+
+  // Engine v1 truoc: goi SONG SONG 2 dang de khong cham hon.
+  //  - ban parsed: co day du metadata (tac gia, mo ta, nhac, anh bia)
+  //  - ban raw (showOriginalResponse): rong metadata NHUNG chua danh sach cac muc chat luong
+  // Ghep 2 ban lai moi co du "metadata day du + chat luong cao nhat".
+  try {
+    const [parsedR, rawR] = await Promise.allSettled([
+      Tiktok.Downloader(url, { version: "v1" }),
+      Tiktok.Downloader(url, { version: "v1", showOriginalResponse: true }),
+    ]);
+
+    const parsed = parsedR.status === "fulfilled" ? parsedR.value : null;
+    const data = normalize(parsed, "v1");
+
+    if (data) {
+      const rawContent =
+        rawR.status === "fulfilled" && rawR.value?.resultNotParsed?.content
+          ? rawR.value.resultNotParsed.content
+          : null;
+
+      if (rawContent) {
+        const qualities = extractVideoQualities(rawContent.video);
+        if (qualities.length) {
+          data.videoQualities = qualities;
+          data.videoNoWatermark = qualities[0].url; // ban nhieu pixel nhat
+          // Ban H.264 net nhat - dung lam phuong an du khi ban cao nhat la H.265
+          // (mot so may/phan mem khong giai ma duoc H.265).
+          const bestH264 = qualities.find((q) => q.compatible);
+          if (bestH264) data.videoCompatible = bestH264;
+        }
+        // Anh goc tu raw thuong day du hon ban parsed.
+        const rawImages = extractImageUrls(rawContent);
+        if (rawImages.length >= (data.images?.length || 0)) data.images = rawImages;
+      }
+
+      if (data.videoNoWatermark || data.videoWatermark || data.images.length) {
+        return res.json({ ok: true, engine: rawContent ? "v1+raw" : "v1", data });
+      }
+    }
+    lastError = parsed?.message || "Khong lay duoc du lieu tu v1";
+  } catch (err) {
+    lastError = err.message;
+  }
+
+  // v1 that bai thi thu cac engine con lai (khong co thong tin chat luong chi tiet).
+  for (const version of ["v3", "v2"]) {
     try {
       const raw = await Tiktok.Downloader(url, { version });
       const data = normalize(raw, version);

@@ -1,11 +1,20 @@
 const urlInput = document.getElementById("url-input");
 const fetchBtn = document.getElementById("fetch-btn");
 const pasteBtn = document.getElementById("paste-btn");
+const resetBtn = document.getElementById("reset-btn");
 const output = document.getElementById("output");
 
 fetchBtn.addEventListener("click", handleFetch);
 urlInput.addEventListener("keydown", (e) => { if (e.key === "Enter") handleFetch(); });
 pasteBtn.addEventListener("click", handlePaste);
+if (resetBtn) resetBtn.addEventListener("click", handleReset);
+
+// Xoa ket qua cu + o nhap de dan link moi ma khong phai tai lai trang.
+function handleReset() {
+  urlInput.value = "";
+  output.innerHTML = "";
+  urlInput.focus();
+}
 
 async function handlePaste() {
   try {
@@ -50,6 +59,29 @@ async function handleFetch() {
 
 function dlUrl(src, name, type) {
   return `/api/download?src=${encodeURIComponent(src)}&name=${encodeURIComponent(name)}&type=${type}`;
+}
+
+function fmtSize(bytes) {
+  if (!bytes) return "";
+  return (bytes / 1048576).toFixed(2) + " MB";
+}
+
+function codecLabel(codec) {
+  return codec === "h264" ? "H.264" : "H.265";
+}
+
+// Nut tai 1 muc chat luong: dong tren la do phan giai + dung luong,
+// dong duoi ghi ro codec de nguoi dung biet may minh co mo duoc khong.
+function qualityBtnHtml(q, safeName, isPrimary) {
+  const cls = isPrimary ? "btn-dl primary" : "btn-dl-sm";
+  const name = safeName + "_" + q.label + "_" + q.codec;
+  const badge = q.compatible ? '<span class="q-badge">tương thích mọi máy</span>' : "";
+  return `<a class="${cls}" href="${dlUrl(q.url, name, "video")}">
+    <span class="q-main">
+      <span class="q-top">${isPrimary ? "⬇ Tải " : "⬇ "}${q.label} · ${fmtSize(q.size)}</span>
+      <span class="q-sub">${q.width}×${q.height} · ${codecLabel(q.codec)}${badge}</span>
+    </span>
+  </a>`;
 }
 
 // Phan loai noi dung de quyet dinh nut tai chinh: video thuong / anh tinh (slideshow) / "live photo"
@@ -111,10 +143,37 @@ function renderResult(data) {
 
   if (kind === "video") {
     const previewSrc = data.videoNoWatermark || data.videoWatermark;
-    html += `<video src="${previewSrc}" controls playsinline></video>
-      <div class="dl-row">
+    const qs = data.videoQualities || [];
+    html += `<video src="${previewSrc}" controls playsinline></video>`;
+
+    if (qs.length) {
+      const top = qs[0];
+      const compat = data.videoCompatible;
+      // Neu ban net nhat khong phai H.264, dua luon phuong an H.264 ra ngoai
+      // de nguoi dung co duong thoat khi may khong mo duoc H.265.
+      const showCompat = compat && compat.url !== top.url;
+      const rest = qs.slice(1).filter((q) => !showCompat || q.url !== compat.url);
+
+      html += `<div class="dl-row">
+        ${qualityBtnHtml(top, safeName, true)}
+        ${showCompat ? qualityBtnHtml(compat, safeName, false) : ""}
+      </div>`;
+
+      if (rest.length) {
+        html += `<details class="q-more">
+          <summary>Các chất lượng khác (${rest.length})</summary>
+          <div class="q-list">${rest.map((q) => qualityBtnHtml(q, safeName, false)).join("")}</div>
+        </details>`;
+      }
+    } else {
+      // Engine du phong (v2/v3) khong tra ve danh sach chat luong.
+      html += `<div class="dl-row">
         <a class="btn-dl primary" href="${dlUrl(previewSrc, safeName + "_video", "video")}">⬇ Tải video</a>
         ${data.videoWatermark ? `<a class="btn-dl" href="${dlUrl(data.videoWatermark, safeName + "_watermark", "video")}">⬇ Bản có watermark</a>` : ""}
+      </div>`;
+    }
+
+    html += `<div class="dl-row" style="margin-top:10px">
         ${data.music ? `<a class="btn-dl" href="${dlUrl(data.music, safeName + "_audio", "audio")}">🎵 Nhạc nền</a>` : ""}
         ${data.coverStatic ? `<a class="btn-dl" href="${dlUrl(data.coverStatic, safeName + "_cover_static", "image")}">🖼 Ảnh bìa tĩnh</a>` : ""}
         ${data.coverDynamic ? `<a class="btn-dl" href="${dlUrl(data.coverDynamic, safeName + "_cover_dynamic", "image")}">🌀 Ảnh bìa động</a>` : ""}

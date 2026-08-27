@@ -635,6 +635,25 @@
     transition: transform 0.28s var(--ease), background 0.28s var(--ease),
                 color 0.28s var(--ease), border-color 0.28s var(--ease);
   }
+  /* Danh sach chat luong video: nhan ro do phan giai + codec + dung luong */
+  .q-main { display:flex; flex-direction:column; gap:2px; }
+  .q-main .q-top { font-weight:700; }
+  .q-main .q-sub { font-size:11px; opacity:.85; font-weight:500; }
+  .q-more { margin-top:10px; }
+  .q-more > summary {
+    cursor:pointer; font-size:12px; color:var(--ink-dim, inherit); opacity:.8;
+    padding:6px 2px; list-style:none; user-select:none;
+  }
+  .q-more > summary::-webkit-details-marker { display:none; }
+  .q-more > summary::before { content:"▸ "; }
+  .q-more[open] > summary::before { content:"▾ "; }
+  .q-more > summary:hover { opacity:1; }
+  .q-list { display:flex; flex-direction:column; gap:8px; margin-top:8px; }
+  .q-list .btn-dl-sm { text-align:left; padding:10px 12px; }
+  .q-badge {
+    display:inline-block; font-size:10px; font-weight:700; padding:2px 7px; border-radius:8px;
+    margin-left:6px; background:rgba(120,220,180,.22); border:1px solid rgba(120,220,180,.45);
+  }
   .btn-dl-sm:hover {
     background: rgba(255, 255, 255, 0.82);
     border-color: #fff;
@@ -747,6 +766,7 @@
         <div class="btn-group">
           <button type="button" class="btn-paste" id="paste-btn" title="Dán từ clipboard">📋 Dán</button>
           <button type="button" class="btn-primary" id="fetch-btn">Lấy về</button>
+          <button type="button" class="btn-paste" id="reset-btn" title="Xoá để dán link khác">🔄 Link khác</button>
         </div>
       </div>
 
