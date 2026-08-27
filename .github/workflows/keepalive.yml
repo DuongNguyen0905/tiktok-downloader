@@ -1,0 +1,22 @@
+name: Keep server awake
+
+# Render (goi free) cho server "ngu" sau ~15 phut khong co request, khien lan
+# vao tiep theo mat ~50s de "thuc". Workflow nay ping /healthz - endpoint sieu
+# nhe khong doc file, khong goi TikTok, chi tra ve 2 byte - moi 10 phut de
+# server luon o trang thai thuc.
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch: {} # cho phep bam chay tay tu tab Actions de test
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping /healthz
+        run: |
+          code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 60 https://tiktok-downloader-xfnb.onrender.com/healthz)
+          echo "HTTP $code"
+          if [ "$code" != "200" ]; then
+            echo "::warning::Ping healthz tra ve $code thay vi 200"
+          fi
