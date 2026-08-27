@@ -52,7 +52,7 @@ function extractVideoQualities(rawVideo) {
   if (!rawVideo || typeof rawVideo !== "object") return [];
   const out = [];
 
-  const push = (addr, source, codec) => {
+  const push = (addr, source, codec, gear) => {
     if (!addr || !Array.isArray(addr.url_list)) return;
     const url = addr.url_list.find((u) => u && !hasWatermarkMark(u));
     if (!url) return;
@@ -63,16 +63,21 @@ function extractVideoQualities(rawVideo) {
       size: addr.data_size || 0,
       source,
       codec: codec || "h264",
+      gear: gear || "",
+      // TikTok dat ten "adapt_*/lower_*/lowest_*" cho cac ban adaptive streaming (dung khi
+      // mang yeu). Ban "adapt_lower_720" phong to len 720p roi nen manh -> nhieu pixel hon
+      // nhung KHONG net hon ban chinh. Danh dau de khong nham la ban tot nhat.
+      adaptive: /adapt|lower|lowest/i.test(gear || ""),
     });
   };
 
-  push(rawVideo.play_addr, "play_addr", "h264");
-  push(rawVideo.play_addr_h264, "play_addr_h264", "h264");
-  push(rawVideo.play_addr_bytevc1, "play_addr_bytevc1", "h265");
+  push(rawVideo.play_addr, "play_addr", "h264", "");
+  push(rawVideo.play_addr_h264, "play_addr_h264", "h264", "");
+  push(rawVideo.play_addr_bytevc1, "play_addr_bytevc1", "h265", "");
   if (Array.isArray(rawVideo.bit_rate)) {
     rawVideo.bit_rate.forEach((b, i) => {
       if (!b) return;
-      push(b.play_addr, "bit_rate[" + i + "]" + (b.gear_name ? " " + b.gear_name : ""), b.is_bytevc1 ? "h265" : "h264");
+      push(b.play_addr, "bit_rate[" + i + "]", b.is_bytevc1 ? "h265" : "h264", b.gear_name || "");
     });
   }
 
@@ -85,8 +90,10 @@ function extractVideoQualities(rawVideo) {
     return true;
   });
 
-  // Nhieu pixel truoc; cung do phan giai thi ban nang hon (it nen hon) truoc.
-  uniq.sort((a, b) => (b.width * b.height) - (a.width * a.height) || b.size - a.size);
+  // Dung luong (bitrate) truoc, so pixel chi la tie-break.
+  // Ly do: cung 1 video nguon, bitrate cao = it nen = it artifact = net hon thuc su.
+  // Sap theo pixel se dua ban "adapt_lower_720" (phong to roi nen manh) len dau -> sai.
+  uniq.sort((a, b) => b.size - a.size || (b.width * b.height) - (a.width * a.height));
 
   return uniq.map((q) => ({
     ...q,
@@ -95,6 +102,17 @@ function extractVideoQualities(rawVideo) {
     // nhung may cu hoac Windows thieu HEVC extension co the khong mo duoc.
     compatible: q.codec === "h264",
   }));
+}
+
+// Chon ban tot nhat cho nguoi dung: bitrate cao nhat, va uu tien H.264 khi hai ban
+// gan tuong duong - vi H.265 net hon o cung dung luong nhung may cu / Windows thieu
+// HEVC extension co the khong mo duoc file.
+function pickBestQuality(list) {
+  if (!list || !list.length) return null;
+  const top = list[0]; // list da sap theo dung luong giam dan
+  if (top.codec === "h264") return top;
+  const nearH264 = list.find((q) => q.codec === "h264" && q.size >= top.size * 0.85);
+  return nearH264 || top;
 }
 
 // Anh trong bai slideshow: uu tien display_image (ban goc, khong watermark),
@@ -203,11 +221,15 @@ app.post("/api/fetch", async (req, res) => {
         const qualities = extractVideoQualities(rawContent.video);
         if (qualities.length) {
           data.videoQualities = qualities;
-          data.videoNoWatermark = qualities[0].url; // ban nhieu pixel nhat
-          // Ban H.264 net nhat - dung lam phuong an du khi ban cao nhat la H.265
-          // (mot so may/phan mem khong giai ma duoc H.265).
-          const bestH264 = qualities.find((q) => q.compatible);
-          if (bestH264) data.videoCompatible = bestH264;
+          const best = pickBestQuality(qualities);
+          data.videoBest = best;
+          data.videoNoWatermark = best.url;
+          // Ban nhieu pixel nhat (thuong la ban adaptive phong to) - de nguoi dung
+          // muon thu thi co, nhung khong dat lam mac dinh.
+          const mostPixels = [...qualities].sort(
+            (a, b) => (b.width * b.height) - (a.width * a.height) || b.size - a.size
+          )[0];
+          if (mostPixels && mostPixels.url !== best.url) data.videoMostPixels = mostPixels;
         }
         // Anh goc tu raw thuong day du hon ban parsed.
         const rawImages = extractImageUrls(rawContent);

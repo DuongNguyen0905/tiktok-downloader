@@ -70,16 +70,26 @@ function codecLabel(codec) {
   return codec === "h264" ? "H.264" : "H.265";
 }
 
+// Nhan giai thich cho tung ban, de nguoi dung hieu vi sao ban nay duoc chon.
+function qualityBadges(q, isPrimary) {
+  const b = [];
+  if (isPrimary) b.push('<span class="q-badge">nét nhất</span>');
+  // Ban "adapt_*/lower_*" cua TikTok phong to do phan giai roi nen manh:
+  // nhieu pixel hon nhung it chi tiet thuc hon ban chinh.
+  if (q.adaptive) b.push('<span class="q-badge q-warn">bản nén mạnh</span>');
+  if (q.codec !== "h264") b.push('<span class="q-badge q-warn">máy cũ có thể không mở</span>');
+  return b.join("");
+}
+
 // Nut tai 1 muc chat luong: dong tren la do phan giai + dung luong,
 // dong duoi ghi ro codec de nguoi dung biet may minh co mo duoc khong.
 function qualityBtnHtml(q, safeName, isPrimary) {
   const cls = isPrimary ? "btn-dl primary" : "btn-dl-sm";
   const name = safeName + "_" + q.label + "_" + q.codec;
-  const badge = q.compatible ? '<span class="q-badge">tương thích mọi máy</span>' : "";
   return `<a class="${cls}" href="${dlUrl(q.url, name, "video")}">
     <span class="q-main">
       <span class="q-top">${isPrimary ? "⬇ Tải " : "⬇ "}${q.label} · ${fmtSize(q.size)}</span>
-      <span class="q-sub">${q.width}×${q.height} · ${codecLabel(q.codec)}${badge}</span>
+      <span class="q-sub">${q.width}×${q.height} · ${codecLabel(q.codec)}${qualityBadges(q, isPrimary)}</span>
     </span>
   </a>`;
 }
@@ -147,16 +157,16 @@ function renderResult(data) {
     html += `<video src="${previewSrc}" controls playsinline></video>`;
 
     if (qs.length) {
-      const top = qs[0];
-      const compat = data.videoCompatible;
-      // Neu ban net nhat khong phai H.264, dua luon phuong an H.264 ra ngoai
-      // de nguoi dung co duong thoat khi may khong mo duoc H.265.
-      const showCompat = compat && compat.url !== top.url;
-      const rest = qs.slice(1).filter((q) => !showCompat || q.url !== compat.url);
+      // Server da chon san ban tot nhat (bitrate cao nhat, uu tien H.264).
+      const top = data.videoBest || qs[0];
+      // Ban nhieu pixel nhat thuong la ban adaptive phong to - de nguoi dung tu thu neu muon.
+      const alt = data.videoMostPixels;
+      const showAlt = alt && alt.url !== top.url;
+      const rest = qs.filter((q) => q.url !== top.url && (!showAlt || q.url !== alt.url));
 
       html += `<div class="dl-row">
         ${qualityBtnHtml(top, safeName, true)}
-        ${showCompat ? qualityBtnHtml(compat, safeName, false) : ""}
+        ${showAlt ? qualityBtnHtml(alt, safeName, false) : ""}
       </div>`;
 
       if (rest.length) {
