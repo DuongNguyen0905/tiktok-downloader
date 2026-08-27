@@ -15,7 +15,7 @@ jobs:
     steps:
       - name: Ping /healthz
         run: |
-          code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 60 https://tiktok-downloader-xfnb.onrender.com/healthz)
+          code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 60 https://tiksave.onrender.com/healthz)
           echo "HTTP $code"
           if [ "$code" != "200" ]; then
             echo "::warning::Ping healthz tra ve $code thay vi 200"

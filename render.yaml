@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: tiktok-downloader
+    name: tiksave
     runtime: node
     plan: free
     buildCommand: npm install
