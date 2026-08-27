@@ -46,7 +46,7 @@ Dùng [Render.com](https://render.com) — có gói **free**, deploy thẳng t�
    đồng ý cấp quyền cho repo này).
 4. Render tự đọc file [`render.yaml`](render.yaml) có sẵn trong repo và tạo Web Service đúng cấu hình.
 5. Bấm **Apply** / **Deploy** — đợi build xong (khoảng 1-2 phút) là có link web dùng ngay,
-   dạng `https://tiksave.onrender.com`.
+   dạng `https://tiksave-app.onrender.com`.
 
 ### Cách 2 — Tạo Web Service thủ công
 
