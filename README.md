@@ -1,7 +1,7 @@
-# 🎵 CAS TikTok Downloader
+# 🎵 TikSave
 
 Web tải video, ảnh và "Live Photo" (slideshow có bản dựng động) từ TikTok, không watermark.
-Không cần cài đặt gì để dùng — dán link vào là lấy về.
+Giao diện liquid glass, dùng được trên cả điện thoại và laptop — dán link vào là lấy về.
 
 ## ⚠️ Lưu ý sử dụng
 
@@ -21,6 +21,9 @@ nếu chia sẻ lại — không dùng công cụ này để đăng lại nội 
   link rút gọn (`vt.tiktok.com`, `vm.tiktok.com`), hoặc cả đoạn text chia sẻ có kèm caption
   copy nguyên từ app TikTok trên điện thoại — tool tự tìm link bên trong.
 - Không giới hạn thiết bị: dùng link copy từ điện thoại hay từ trình duyệt laptop đều được.
+- Giao diện liquid glass (kính lỏng): nền aurora gradient chuyển động, bề mặt kính mờ
+  (`backdrop-filter`), có fallback khi trình duyệt không hỗ trợ và tôn trọng
+  `prefers-reduced-motion`.
 
 ## Chạy thử ở máy (tuỳ chọn — không bắt buộc nếu đã deploy)
 

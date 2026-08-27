@@ -3,104 +3,772 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>CAS TikTok Downloader</title>
+<meta name="color-scheme" content="light" />
+<title>TikSave · Tải video / ảnh TikTok</title>
 <style>
+  /* ==========================================================
+     TikSave — Aurora pastel / liquid glass
+     Mot file, CSS inline, font he thong, khong thu vien ngoai.
+     ========================================================== */
+
   :root {
-    --bg: #0f1115; --bg-elev: #171a22; --bg-elev-2: #1f2430;
-    --text: #eceef2; --text-dim: #9aa1b1; --accent: #ff2d55; --accent-2: #25f4ee;
-    --border: #2a2f3d; --radius: 12px;
+    /* Nen aurora */
+    --base:        #f4f0fb;
+    --aurora-1:    #b79cff;  /* tim */
+    --aurora-2:    #93e6cf;  /* xanh mint */
+    --aurora-3:    #ffb0cf;  /* hong nhat */
+    --aurora-4:    #ffd2a1;  /* cam nhat */
+
+    /* Chu (mau am, kiem tra tuong phan >= 4.5:1 tren mat kinh sang) */
+    --ink:         #1b1730;
+    --ink-2:       #4a4463;
+    --violet-ink:  #5b3fb0;
+    --danger-ink:  #b3123f;
+
+    /* Mat kinh long: rgba + blur, vien sang, highlight canh tren */
+    --glass:       rgba(255, 255, 255, 0.42);
+    --glass-soft:  rgba(255, 255, 255, 0.30);
+    --glass-deep:  rgba(255, 255, 255, 0.56);
+    --glass-line:  rgba(255, 255, 255, 0.70);
+    --glass-line-2:rgba(255, 255, 255, 0.45);
+    --blur:        saturate(180%) blur(34px);
+    --blur-sm:     saturate(170%) blur(20px);
+
+    --shadow-lg:
+      0 24px 60px -18px rgba(72, 48, 130, 0.30),
+      0 8px 24px -12px rgba(72, 48, 130, 0.20);
+    --shadow-md:
+      0 14px 34px -14px rgba(72, 48, 130, 0.26),
+      0 4px 12px -6px rgba(72, 48, 130, 0.16);
+    --inset-top:
+      inset 0 1px 0 rgba(255, 255, 255, 0.92),
+      inset 0 -1px 0 rgba(255, 255, 255, 0.32);
+
+    --r-xl: 30px;
+    --r-lg: 22px;
+    --r-md: 16px;
+    --r-sm: 13px;
+
+    --ease: cubic-bezier(0.22, 1, 0.36, 1);
   }
+
   * { box-sizing: border-box; }
-  html, body { margin:0; padding:0; background:var(--bg); color:var(--text); font-family:"Segoe UI",Roboto,Arial,sans-serif; min-height:100vh; }
-  .wrap { max-width: 720px; margin: 0 auto; padding: 32px 20px 60px; }
-  h1 { font-size: 24px; text-align:center; margin-bottom: 4px; }
-  .sub { text-align:center; color: var(--text-dim); font-size: 13px; margin-bottom: 28px; }
-  .form-row { display:flex; gap:8px; margin-bottom: 8px; }
-  input[type=text] {
-    flex:1; padding: 14px 16px; border-radius: var(--radius); border:1px solid var(--border);
-    background: var(--bg-elev); color: var(--text); font-size: 14px; outline:none;
+
+  html { -webkit-text-size-adjust: 100%; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background-color: var(--base);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text",
+                 "Segoe UI", Roboto, "Helvetica Neue", "Noto Sans", Arial, sans-serif;
+    font-size: 16px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
   }
-  input[type=text]:focus { border-color: var(--accent); }
-  button { cursor:pointer; border:none; font-weight:600; }
-  .btn-primary {
-    padding: 14px 22px; border-radius: var(--radius);
-    background: linear-gradient(135deg, var(--accent), #ff5e7a); color:#fff; font-size:14px;
+
+  /* ---------- 1. NEN AURORA (blob mau dich chuyen cham) ---------- */
+
+  .aurora {
+    position: fixed;
+    inset: -12vmax;
+    z-index: 0;
+    pointer-events: none;
+    overflow: hidden;
   }
-  .btn-primary:disabled { opacity:0.6; cursor:not-allowed; }
+
+  .blob {
+    position: absolute;
+    display: block;
+    border-radius: 50%;
+    filter: blur(58px);
+    opacity: 0.78;
+    will-change: transform;
+  }
+
+  .b1 {
+    width: 62vmax; height: 62vmax;
+    top: -14vmax; left: -10vmax;
+    background: radial-gradient(circle at 40% 40%, var(--aurora-1) 0%, rgba(183,156,255,0) 68%);
+    animation: drift-a 34s var(--ease) infinite alternate;
+  }
+  .b2 {
+    width: 54vmax; height: 54vmax;
+    top: 6vmax; right: -14vmax;
+    background: radial-gradient(circle at 55% 45%, var(--aurora-2) 0%, rgba(147,230,207,0) 70%);
+    animation: drift-b 41s var(--ease) infinite alternate;
+  }
+  .b3 {
+    width: 58vmax; height: 58vmax;
+    bottom: -18vmax; left: 4vmax;
+    background: radial-gradient(circle at 50% 50%, var(--aurora-3) 0%, rgba(255,176,207,0) 70%);
+    animation: drift-c 47s var(--ease) infinite alternate;
+  }
+  .b4 {
+    width: 46vmax; height: 46vmax;
+    bottom: -6vmax; right: -8vmax;
+    background: radial-gradient(circle at 50% 50%, var(--aurora-4) 0%, rgba(255,210,161,0) 70%);
+    animation: drift-d 38s var(--ease) infinite alternate;
+  }
+
+  /* Lop hat mo cuc nhe -> mat kinh trong that hon, do bang SVG data URI (khong tai ngoai) */
+  .grain {
+    position: absolute;
+    inset: 0;
+    display: block;
+    opacity: 0.055;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  @keyframes drift-a {
+    from { transform: translate3d(0, 0, 0) scale(1); }
+    to   { transform: translate3d(9vmax, 7vmax, 0) scale(1.16); }
+  }
+  @keyframes drift-b {
+    from { transform: translate3d(0, 0, 0) scale(1.08); }
+    to   { transform: translate3d(-11vmax, 10vmax, 0) scale(0.94); }
+  }
+  @keyframes drift-c {
+    from { transform: translate3d(0, 0, 0) scale(0.96); }
+    to   { transform: translate3d(12vmax, -9vmax, 0) scale(1.18); }
+  }
+  @keyframes drift-d {
+    from { transform: translate3d(0, 0, 0) scale(1.1); }
+    to   { transform: translate3d(-8vmax, -11vmax, 0) scale(0.92); }
+  }
+
+  /* ---------- 2. KHUNG TRANG ---------- */
+
+  .wrap {
+    position: relative;
+    z-index: 1;
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 46px 18px 64px;
+  }
+
+  .hero { text-align: center; margin-bottom: 26px; }
+
+  .logo-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 16px 7px 12px;
+    margin-bottom: 16px;
+    border-radius: 999px;
+    border: 1px solid var(--glass-line);
+    background: var(--glass-deep);
+    -webkit-backdrop-filter: var(--blur-sm);
+    backdrop-filter: var(--blur-sm);
+    box-shadow: var(--inset-top), var(--shadow-md);
+    font-size: 13px;
+    font-weight: 650;
+    letter-spacing: 0.2px;
+    color: var(--violet-ink);
+  }
+  .logo-chip .dot {
+    width: 9px; height: 9px; border-radius: 50%;
+    background: linear-gradient(140deg, #7a4ddb, #d86ab0);
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.55);
+  }
+
+  h1 {
+    margin: 0 0 8px;
+    font-size: clamp(28px, 7vw, 42px);
+    line-height: 1.14;
+    font-weight: 750;
+    letter-spacing: -0.6px;
+    color: var(--ink);
+  }
+  h1 .grad {
+    background: linear-gradient(100deg, #5e37c4 0%, #b0479b 52%, #c4642f 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .sub {
+    margin: 0 auto;
+    max-width: 46ch;
+    font-size: 15px;
+    color: var(--ink-2);
+  }
+
+  /* ---------- 3. MAT KINH LONG (glass surface) ---------- */
+
+  .glass {
+    position: relative;
+    border: 1px solid var(--glass-line);
+    background: var(--glass);
+    -webkit-backdrop-filter: var(--blur);
+    backdrop-filter: var(--blur);
+    box-shadow: var(--inset-top), var(--shadow-lg);
+  }
+
+  /* Do bong / phan chieu tren be mat kinh */
+  .glass::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    background:
+      linear-gradient(158deg,
+        rgba(255, 255, 255, 0.62) 0%,
+        rgba(255, 255, 255, 0.16) 26%,
+        rgba(255, 255, 255, 0.00) 52%),
+      radial-gradient(120% 70% at 12% -10%,
+        rgba(255, 255, 255, 0.55) 0%,
+        rgba(255, 255, 255, 0.00) 60%);
+  }
+  .glass > * { position: relative; }
+
+  .panel {
+    border-radius: var(--r-xl);
+    padding: 22px;
+  }
+
+  /* ---------- 4. LUU Y BAN QUYEN ---------- */
+
+  .notice {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    padding: 13px 15px;
+    margin-bottom: 18px;
+    border-radius: var(--r-md);
+    border: 1px solid var(--glass-line-2);
+    background: rgba(255, 255, 255, 0.34);
+    font-size: 13px;
+    line-height: 1.62;
+    color: var(--ink-2);
+  }
+  .notice .ico { flex: 0 0 auto; font-size: 15px; line-height: 1.45; }
+  .notice b { color: var(--ink); font-weight: 650; }
+
+  /* ---------- 5. FORM ---------- */
+
+  .form-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  input[type="text"] {
+    flex: 1 1 260px;
+    min-width: 0;
+    padding: 15px 18px;
+    border-radius: var(--r-lg);
+    border: 1px solid rgba(255, 255, 255, 0.62);
+    background: rgba(255, 255, 255, 0.58);
+    -webkit-backdrop-filter: var(--blur-sm);
+    backdrop-filter: var(--blur-sm);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.95),
+      inset 0 2px 10px rgba(96, 72, 150, 0.10);
+    color: var(--ink);
+    font-family: inherit;
+    font-size: 15px;
+    outline: none;
+    transition: border-color 0.28s var(--ease), box-shadow 0.28s var(--ease),
+                background 0.28s var(--ease), transform 0.28s var(--ease);
+  }
+  input[type="text"]::placeholder { color: #6a6486; opacity: 1; }
+  input[type="text"]:hover { background: rgba(255, 255, 255, 0.66); }
+  input[type="text"]:focus {
+    border-color: rgba(124, 84, 214, 0.65);
+    background: rgba(255, 255, 255, 0.76);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.95),
+      0 0 0 4px rgba(139, 100, 224, 0.22),
+      0 10px 26px -14px rgba(88, 58, 160, 0.45);
+  }
+
+  .btn-group { display: flex; flex-wrap: wrap; gap: 10px; flex: 0 1 auto; }
+
+  button, .btn-dl, .btn-dl-sm {
+    font-family: inherit;
+    cursor: pointer;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
+  .btn-paste, .btn-primary {
+    position: relative;
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 15px 20px;
+    border-radius: var(--r-lg);
+    font-size: 15px;
+    font-weight: 650;
+    letter-spacing: 0.1px;
+    overflow: hidden;
+    transition: transform 0.3s var(--ease), box-shadow 0.3s var(--ease),
+                background 0.3s var(--ease), border-color 0.3s var(--ease);
+  }
+
   .btn-paste {
-    padding: 14px 16px; border-radius: var(--radius);
-    background: var(--bg-elev-2); color:var(--text); border:1px solid var(--border); font-size:14px;
+    border: 1px solid var(--glass-line);
+    background: rgba(255, 255, 255, 0.52);
+    -webkit-backdrop-filter: var(--blur-sm);
+    backdrop-filter: var(--blur-sm);
+    box-shadow: var(--inset-top), var(--shadow-md);
+    color: var(--ink);
   }
-  .btn-paste:hover { border-color: var(--accent-2); }
+  .btn-paste:hover {
+    background: rgba(255, 255, 255, 0.72);
+    transform: translateY(-2px);
+  }
+  .btn-paste:active { transform: translateY(0) scale(0.975); }
+
+  .btn-primary {
+    border: 1px solid rgba(255, 255, 255, 0.42);
+    background: linear-gradient(135deg, #6f45c9 0%, #8b46bf 46%, #a94a9d 100%);
+    color: #fff;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.42),
+      0 14px 30px -12px rgba(97, 55, 172, 0.62),
+      0 4px 12px -6px rgba(97, 55, 172, 0.40);
+  }
+  .btn-primary::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0) 58%);
+  }
+  .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.5),
+      0 20px 40px -12px rgba(97, 55, 172, 0.68),
+      0 6px 16px -8px rgba(97, 55, 172, 0.46);
+  }
+  .btn-primary:active { transform: translateY(0) scale(0.975); }
+  .btn-primary:disabled { opacity: 0.62; cursor: progress; transform: none; }
+
+  :focus-visible {
+    outline: 3px solid rgba(94, 55, 196, 0.65);
+    outline-offset: 2px;
+  }
+
+  .hint {
+    margin: 0;
+    padding: 0 4px;
+    font-size: 12.5px;
+    line-height: 1.65;
+    color: var(--ink-2);
+  }
+  .hint code {
+    padding: 1px 6px;
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.5);
+    border: 1px solid var(--glass-line-2);
+    font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
+    font-size: 11.5px;
+    color: var(--violet-ink);
+  }
+
+  /* ---------- 6. TRANG THAI ---------- */
+
+  .status {
+    margin-top: 16px;
+    padding: 22px 20px;
+    border-radius: var(--r-xl);
+    border: 1px solid var(--glass-line);
+    background: var(--glass);
+    -webkit-backdrop-filter: var(--blur);
+    backdrop-filter: var(--blur);
+    box-shadow: var(--inset-top), var(--shadow-md);
+    text-align: center;
+    font-size: 14.5px;
+    font-weight: 550;
+    color: var(--ink-2);
+  }
+  .status small {
+    display: block;
+    margin-top: 6px;
+    font-size: 12.5px;
+    font-weight: 400;
+    opacity: 0.92;
+  }
+  .status.error {
+    border-color: rgba(214, 122, 156, 0.55);
+    background: rgba(255, 240, 245, 0.52);
+    color: var(--danger-ink);
+  }
+
+  /* Trang thai loi nam trong the ket qua thi gon lai */
+  .result-card > .status { margin-top: 4px; }
+
+  /* ---------- 7. THE KET QUA ---------- */
+
+  .result-card {
+    position: relative;
+    margin-top: 18px;
+    padding: 20px;
+    border-radius: var(--r-xl);
+    border: 1px solid var(--glass-line);
+    background: var(--glass);
+    -webkit-backdrop-filter: var(--blur);
+    backdrop-filter: var(--blur);
+    box-shadow: var(--inset-top), var(--shadow-lg);
+    animation: rise 0.5s var(--ease) both;
+  }
+  .result-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    background:
+      linear-gradient(158deg,
+        rgba(255, 255, 255, 0.60) 0%,
+        rgba(255, 255, 255, 0.14) 24%,
+        rgba(255, 255, 255, 0.00) 50%),
+      radial-gradient(120% 70% at 10% -12%,
+        rgba(255, 255, 255, 0.55) 0%,
+        rgba(255, 255, 255, 0.00) 62%);
+  }
+  .result-card > * { position: relative; }
+
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(14px) scale(0.985); }
+    to   { opacity: 1; transform: none; }
+  }
+
   .type-badge {
-    display:inline-block; font-size:11px; font-weight:700; padding:3px 10px; border-radius:12px;
-    background: var(--bg-elev-2); color: var(--accent-2); margin-bottom:10px; letter-spacing:.3px;
+    display: inline-block;
+    margin-bottom: 14px;
+    padding: 5px 13px;
+    border-radius: 999px;
+    border: 1px solid var(--glass-line);
+    background: rgba(255, 255, 255, 0.55);
+    -webkit-backdrop-filter: var(--blur-sm);
+    backdrop-filter: var(--blur-sm);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+    font-size: 11.5px;
+    font-weight: 750;
+    letter-spacing: 0.5px;
+    color: var(--violet-ink);
   }
-  .notice { font-size:12px; color:var(--text-dim); line-height:1.6; background:var(--bg-elev); border:1px solid var(--border); border-radius:var(--radius); padding:12px 14px; margin-bottom:24px; }
-  .status { text-align:center; padding: 20px; color: var(--text-dim); font-size:14px; }
-  .status.error { color: #ff6b6b; }
-  .result-card { background: var(--bg-elev); border:1px solid var(--border); border-radius: var(--radius); padding:18px; margin-top: 10px; }
-  .result-head { display:flex; align-items:center; gap:10px; margin-bottom:14px; }
-  .result-head img { width:40px; height:40px; border-radius:50%; object-fit:cover; background:var(--bg-elev-2); }
-  .result-head .name { font-weight:600; font-size:14px; }
-  .result-head .desc { font-size:12px; color:var(--text-dim); margin-top:2px; }
-  video { width:100%; border-radius:8px; background:#000; display:block; margin-bottom:14px; }
-  .img-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:10px; margin-bottom:14px; }
-  .img-grid img { width:100%; border-radius:8px; display:block; }
-  .dl-row { display:flex; gap:10px; flex-wrap:wrap; }
-  .btn-dl {
-    flex:1; min-width:160px; text-align:center; padding:12px 16px; border-radius:8px;
-    background: var(--bg-elev-2); color:var(--text); border:1px solid var(--border); font-size:13px; text-decoration:none; display:block;
+
+  .result-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+    padding: 12px 14px;
+    border-radius: var(--r-lg);
+    border: 1px solid var(--glass-line-2);
+    background: rgba(255, 255, 255, 0.32);
   }
-  .btn-dl:hover { border-color: var(--accent-2); }
-  .btn-dl.primary { background: var(--accent); border-color: var(--accent); color:#fff; }
-  /* Dong tong hop so anh + nut tai tat ca, dat ngay dong dau cua ket qua */
+  .result-head img {
+    flex: 0 0 auto;
+    width: 46px; height: 46px;
+    border-radius: 50%;
+    object-fit: cover;
+    background: rgba(255, 255, 255, 0.6);
+    box-shadow:
+      0 0 0 2px rgba(255, 255, 255, 0.85),
+      0 6px 16px -6px rgba(72, 48, 130, 0.4);
+  }
+  .result-head .name {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--ink);
+    line-height: 1.3;
+  }
+  .result-head .desc {
+    margin-top: 3px;
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--ink-2);
+    overflow-wrap: anywhere;
+  }
+
+  /* ---------- 8. MEDIA ---------- */
+
+  video {
+    display: block;
+    width: 100%;
+    margin-bottom: 16px;
+    border-radius: var(--r-lg);
+    border: 1px solid var(--glass-line-2);
+    background: #17122a;
+    box-shadow: var(--shadow-md);
+  }
+
   .media-summary {
-    display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
-    background: var(--bg-elev-2); border:1px solid var(--border); border-radius:8px;
-    padding:12px 14px; margin-bottom:14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 16px;
+    padding: 14px 16px;
+    border-radius: var(--r-lg);
+    border: 1px solid var(--glass-line);
+    background: rgba(255, 255, 255, 0.40);
+    -webkit-backdrop-filter: var(--blur-sm);
+    backdrop-filter: var(--blur-sm);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
   }
-  .media-summary .count { font-size:14px; font-weight:700; }
-  .media-summary .count small { display:block; font-weight:400; font-size:12px; color:var(--text-dim); margin-top:3px; }
-  .media-summary .btn-dl { flex:0 0 auto; min-width:0; }
-  /* Moi anh la 1 the rieng: anh o tren, nut tai ngay ben duoi */
-  .img-card { display:flex; flex-direction:column; gap:8px; }
-  .img-card img { width:100%; border-radius:8px; display:block; background:var(--bg-elev-2); }
+  .media-summary .count {
+    flex: 1 1 190px;
+    min-width: 0;
+    font-size: 14.5px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+  .media-summary .count small {
+    display: block;
+    margin-top: 4px;
+    font-size: 12.5px;
+    font-weight: 400;
+    line-height: 1.5;
+    color: var(--ink-2);
+  }
+  .media-summary .btn-dl { flex: 0 1 auto; }
+
+  .img-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .img-card {
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    padding: 9px;
+    border-radius: var(--r-lg);
+    border: 1px solid var(--glass-line-2);
+    background: rgba(255, 255, 255, 0.34);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+    transition: transform 0.32s var(--ease), box-shadow 0.32s var(--ease),
+                background 0.32s var(--ease);
+  }
+  .img-card:hover {
+    transform: translateY(-3px);
+    background: rgba(255, 255, 255, 0.5);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.9),
+      var(--shadow-md);
+  }
+  .img-card img,
+  .img-grid img {
+    display: block;
+    width: 100%;
+    border-radius: var(--r-md);
+    background: rgba(255, 255, 255, 0.5);
+  }
+
+  /* ---------- 9. NUT TAI ---------- */
+
+  .dl-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .btn-dl {
+    flex: 1 1 150px;
+    min-width: 0;
+    display: block;
+    padding: 13px 16px;
+    border-radius: var(--r-lg);
+    border: 1px solid var(--glass-line);
+    background: rgba(255, 255, 255, 0.50);
+    -webkit-backdrop-filter: var(--blur-sm);
+    backdrop-filter: var(--blur-sm);
+    box-shadow: var(--inset-top), 0 8px 20px -12px rgba(72, 48, 130, 0.35);
+    color: var(--ink);
+    font-size: 13.5px;
+    font-weight: 650;
+    text-align: center;
+    text-decoration: none;
+    transition: transform 0.3s var(--ease), background 0.3s var(--ease),
+                box-shadow 0.3s var(--ease), border-color 0.3s var(--ease);
+  }
+  .btn-dl:hover {
+    background: rgba(255, 255, 255, 0.72);
+    border-color: #fff;
+    transform: translateY(-2px);
+  }
+  .btn-dl:active { transform: translateY(0) scale(0.975); }
+
+  .btn-dl.primary {
+    border-color: rgba(255, 255, 255, 0.42);
+    background: linear-gradient(135deg, #6f45c9 0%, #8b46bf 46%, #a94a9d 100%);
+    color: #fff;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.42),
+      0 12px 26px -12px rgba(97, 55, 172, 0.60);
+  }
+  .btn-dl.primary:hover {
+    background: linear-gradient(135deg, #7b4dd8 0%, #984ecd 46%, #b653a8 100%);
+    border-color: rgba(255, 255, 255, 0.6);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.5),
+      0 18px 36px -12px rgba(97, 55, 172, 0.66);
+  }
+  .btn-dl.primary:disabled { opacity: 0.64; cursor: progress; transform: none; }
+
   .btn-dl-sm {
-    display:block; width:100%; text-align:center; padding:9px 10px; border-radius:8px;
-    background: var(--bg-elev-2); color:var(--text); border:1px solid var(--border);
-    font-size:12px; font-weight:600; text-decoration:none; cursor:pointer;
+    display: block;
+    width: 100%;
+    padding: 10px 10px;
+    border-radius: var(--r-md);
+    border: 1px solid var(--glass-line-2);
+    background: rgba(255, 255, 255, 0.52);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+    color: var(--ink);
+    font-size: 12.5px;
+    font-weight: 650;
+    text-align: center;
+    text-decoration: none;
+    transition: transform 0.28s var(--ease), background 0.28s var(--ease),
+                color 0.28s var(--ease), border-color 0.28s var(--ease);
   }
-  .btn-dl-sm:hover { border-color: var(--accent-2); color: var(--accent-2); }
-  footer { text-align:center; font-size:11px; color:var(--text-dim); margin-top:30px; }
+  .btn-dl-sm:hover {
+    background: rgba(255, 255, 255, 0.82);
+    border-color: #fff;
+    color: var(--violet-ink);
+    transform: translateY(-1px);
+  }
+  .btn-dl-sm:active { transform: scale(0.97); }
+
+  /* ---------- 10. FOOTER ---------- */
+
+  footer {
+    margin-top: 32px;
+    text-align: center;
+    font-size: 12px;
+    line-height: 1.7;
+    color: var(--ink-2);
+  }
+
+  /* ---------- 11. RESPONSIVE (test 360px) ---------- */
+
+  @media (max-width: 560px) {
+    .wrap { padding: 34px 14px 52px; }
+    .panel { padding: 17px; border-radius: var(--r-lg); }
+    .result-card { padding: 15px; border-radius: var(--r-lg); }
+    input[type="text"] { flex: 1 1 100%; }
+    .btn-group { flex: 1 1 100%; }
+    .btn-paste, .btn-primary { flex: 1 1 42%; padding: 14px 12px; }
+    .btn-dl { flex: 1 1 100%; }
+    .media-summary .btn-dl { flex: 1 1 100%; }
+    .img-grid { grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 10px; }
+  }
+
+  @media (max-width: 380px) {
+    h1 { letter-spacing: -0.3px; }
+    .img-grid { grid-template-columns: 1fr; }
+  }
+
+  /* ---------- 12. FALLBACK khi trinh duyet khong ho tro backdrop-filter ---------- */
+
+  @supports not ((backdrop-filter: blur(4px)) or (-webkit-backdrop-filter: blur(4px))) {
+    .logo-chip     { background: rgba(255, 255, 255, 0.93); }
+    .panel,
+    .status,
+    .result-card   { background: rgba(255, 255, 255, 0.93); }
+    .notice        { background: rgba(255, 255, 255, 0.88); }
+    input[type="text"] { background: rgba(255, 255, 255, 0.96); }
+    input[type="text"]:focus { background: #fff; }
+    .btn-paste     { background: rgba(255, 255, 255, 0.94); }
+    .type-badge,
+    .media-summary { background: rgba(255, 255, 255, 0.9); }
+    .result-head,
+    .img-card      { background: rgba(255, 255, 255, 0.86); }
+    .btn-dl        { background: rgba(255, 255, 255, 0.92); }
+    .btn-dl-sm     { background: rgba(255, 255, 255, 0.9); }
+    .status.error  { background: rgba(255, 240, 245, 0.95); }
+    .blob          { opacity: 0.55; }
+  }
+
+  /* ---------- 13. GIAM CHUYEN DONG ---------- */
+
+  @media (prefers-reduced-motion: reduce) {
+    .blob { animation: none; }
+    .result-card { animation: none; }
+    * {
+      transition-duration: 0.01ms;
+      animation-duration: 0.01ms;
+      animation-iteration-count: 1;
+    }
+  }
 </style>
 </head>
 <body>
-  <div class="wrap">
-    <h1>🎵 CAS TikTok Downloader</h1>
-    <div class="sub">Tải video / ảnh TikTok không watermark</div>
 
-    <div class="notice">
-      ⚠️ Chỉ dùng để tải nội dung bạn sở hữu hoặc được phép lưu lại cho mục đích cá nhân
-      (xem lại video của chính bạn, lưu offline...). Vui lòng tôn trọng bản quyền và ghi công
-      tác giả gốc nếu chia sẻ lại, không dùng công cụ này để đăng lại nội dung của người khác
-      như của mình.
+  <!-- Nen aurora pastel: 4 khoi mau troi cham de thay ro do trong cua kinh -->
+  <div class="aurora" aria-hidden="true">
+    <span class="blob b1"></span>
+    <span class="blob b2"></span>
+    <span class="blob b3"></span>
+    <span class="blob b4"></span>
+    <span class="grain"></span>
+  </div>
+
+  <main class="wrap">
+
+    <div class="hero">
+      <div class="logo-chip"><span class="dot"></span>TikSave</div>
+      <h1>Tải video &amp; ảnh TikTok<br /><span class="grad">không watermark</span></h1>
+      <p class="sub">
+        Dán link, bấm một nút là có file gốc — video, bộ ảnh slideshow, live photo hay nhạc nền.
+      </p>
     </div>
 
-    <div class="form-row">
-      <input type="text" id="url-input" placeholder="Dán link TikTok vào đây (video/ảnh, copy từ điện thoại hay laptop đều được)..." />
-      <button class="btn-paste" id="paste-btn" title="Dán từ clipboard">📋 Dán</button>
-      <button class="btn-primary" id="fetch-btn">Lấy về</button>
-    </div>
-    <div class="sub" style="margin:-2px 0 20px;text-align:left">
-      Hỗ trợ: link đầy đủ (tiktok.com/@user/video/..., .../photo/...), link rút gọn (vt.tiktok.com, vm.tiktok.com),
-      kể cả khi dán nguyên đoạn chia sẻ có kèm caption từ app TikTok trên điện thoại.
-    </div>
+    <section class="glass panel">
+
+      <div class="notice">
+        <span class="ico" aria-hidden="true">⚠️</span>
+        <span>
+          <b>Chỉ tải nội dung bạn sở hữu hoặc được phép lưu lại</b> (video của chính bạn, lưu offline
+          để xem sau…). Tôn trọng bản quyền và ghi công tác giả gốc khi chia sẻ lại — đừng đăng
+          nội dung của người khác như của mình.
+        </span>
+      </div>
+
+      <div class="form-row">
+        <input
+          type="text"
+          id="url-input"
+          autocomplete="off"
+          spellcheck="false"
+          inputmode="url"
+          aria-label="Link TikTok"
+          placeholder="Dán link TikTok vào đây — copy từ điện thoại hay laptop đều được…"
+        />
+        <div class="btn-group">
+          <button type="button" class="btn-paste" id="paste-btn" title="Dán từ clipboard">📋 Dán</button>
+          <button type="button" class="btn-primary" id="fetch-btn">Lấy về</button>
+        </div>
+      </div>
+
+      <p class="hint">
+        Hỗ trợ link đầy đủ (<code>tiktok.com/@user/video/…</code>, <code>…/photo/…</code>),
+        link rút gọn (<code>vt.tiktok.com</code>, <code>vm.tiktok.com</code>), kể cả khi bạn dán
+        nguyên đoạn chia sẻ có kèm caption từ app TikTok trên điện thoại.
+      </p>
+
+    </section>
 
     <div id="output"></div>
 
-    <footer>CAS TikTok Downloader · demo cá nhân, không lưu trữ nội dung trên server.</footer>
-  </div>
+    <footer>
+      TikSave · công cụ cá nhân, không lưu trữ nội dung trên server.
+    </footer>
+
+  </main>
 
   <script src="/app.js"></script>
 </body>
