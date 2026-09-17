@@ -1,6 +1,6 @@
 # 🎵 TikSave
 
-Web tải video, ảnh và "Live Photo" (slideshow có bản dựng động) từ TikTok, không watermark.
+Web tải video và ảnh (slideshow) từ TikTok, không watermark.
 Giao diện liquid glass, dùng được trên cả điện thoại và laptop — dán link vào là lấy về.
 
 ## ⚠️ Lưu ý sử dụng
@@ -12,8 +12,9 @@ nếu chia sẻ lại — không dùng công cụ này để đăng lại nội 
 
 ## Tính năng
 
-- Tự nhận diện loại nội dung và hiện nút tải phù hợp: **Video**, **Ảnh (photo/slideshow)**,
-  hoặc **Live Photo** (slideshow có bản dựng động kèm nhạc).
+- Tự nhận diện loại nội dung và hiện nút tải phù hợp: **Video** hoặc **Ảnh (photo/slideshow)**.
+  (TikTok không cung cấp bản "ảnh động" nào tải được qua API - hiệu ứng chuyển động khi
+  xem trong app TikTok chỉ là hiệu ứng hiển thị, không phải file có thể tải về).
 - Video: tải bản không watermark, bản có watermark (nếu có), nhạc nền, ảnh bìa tĩnh + ảnh bìa động.
 - Ảnh/slideshow: tải từng ảnh riêng hoặc tải tất cả cùng lúc.
 - Nút "📋 Dán" để dán nhanh link từ clipboard và tự động lấy về.

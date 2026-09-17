@@ -94,17 +94,17 @@ function qualityBtnHtml(q, safeName, isPrimary) {
   </a>`;
 }
 
-// Phan loai noi dung de quyet dinh nut tai chinh: video thuong / anh tinh (slideshow) / "live photo"
-// (slideshow ma TikTok co dung sinh ban dong kem nhac - coi nhu tuong duong Live Photo).
+// Phan loai noi dung de quyet dinh nut tai chinh: video thuong hoac anh (slideshow).
+// Da kiem tra thuc te (link Live Photo that): TikTok KHONG cung cap ban "video ghep
+// san" nao cho bai dang anh qua API nay - moi anh deu la anh tinh (bitrate_images luon
+// null). Truoc day nham content.video (chi chua NHAC NEN, mime_type=audio_mpeg cho bai
+// dang anh) thanh "co ban dong" nen sinh ra nhan "Live Photo" sai - da bo hoan toan.
 function classifyKind(data) {
-  if (data.type === "video") return "video";
-  if (data.type === "image" && data.videoNoWatermark) return "livePhoto";
-  return "photo";
+  return data.type === "video" ? "video" : "photo";
 }
 
 const KIND_META = {
   video: { badge: "🎬 VIDEO" },
-  livePhoto: { badge: "🎞️ LIVE PHOTO" },
   photo: { badge: "🖼️ ẢNH" },
 };
 
@@ -154,7 +154,7 @@ function renderResult(data) {
     <div class="type-badge">${meta.badge}</div>`;
 
   // Voi noi dung dang anh, dat dong tong hop len tren cung cho de thay.
-  if ((kind === "photo" || kind === "livePhoto") && n) {
+  if (kind === "photo" && n) {
     html += summaryHtml(
       n,
       "Bấm nút dưới mỗi ảnh để tải riêng, hoặc tải tất cả cùng lúc.",
@@ -206,13 +206,6 @@ function renderResult(data) {
         ${data.music ? `<a class="btn-dl" href="${dlUrl(data.music, safeName + "_audio", "audio")}">🎵 Nhạc nền</a>` : ""}
         ${data.coverStatic ? `<a class="btn-dl" href="${dlUrl(data.coverStatic, safeName + "_cover_static", "image")}">🖼 Ảnh bìa tĩnh</a>` : ""}
         ${data.coverDynamic ? `<a class="btn-dl" href="${dlUrl(data.coverDynamic, safeName + "_cover_dynamic", "image")}">🌀 Ảnh bìa động</a>` : ""}
-      </div>`;
-  } else if (kind === "livePhoto") {
-    html += `<video src="${data.videoNoWatermark}" controls playsinline loop referrerpolicy="no-referrer" ${videoFallbackAttr(data.videoNoWatermark)}></video>
-      ${imageGridHtml(data.images, safeName)}
-      <div class="dl-row">
-        <a class="btn-dl primary" href="${dlUrl(data.videoNoWatermark, safeName + "_live_photo", "video")}">⬇ Tải Live Photo (bản động)</a>
-        ${data.music ? `<a class="btn-dl" href="${dlUrl(data.music, safeName + "_audio", "audio")}">🎵 Nhạc nền</a>` : ""}
       </div>`;
   } else if (kind === "photo" && n) {
     html += imageGridHtml(data.images, safeName);

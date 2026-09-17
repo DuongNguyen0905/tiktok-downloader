@@ -252,18 +252,27 @@ app.post("/api/fetch", fetchLimiter, async (req, res) => {
           : null;
 
       if (rawContent) {
-        const qualities = extractVideoQualities(rawContent.video);
-        if (qualities.length) {
-          data.videoQualities = qualities;
-          const best = pickBestQuality(qualities);
-          data.videoBest = best;
-          data.videoNoWatermark = best.url;
-          // Ban nhieu pixel nhat (thuong la ban adaptive phong to) - de nguoi dung
-          // muon thu thi co, nhung khong dat lam mac dinh.
-          const mostPixels = [...qualities].sort(
-            (a, b) => (b.width * b.height) - (a.width * a.height) || b.size - a.size
-          )[0];
-          if (mostPixels && mostPixels.url !== best.url) data.videoMostPixels = mostPixels;
+        // QUAN TRONG: content.video TON TAI CHO CA BAI DANG ANH, nhung voi bai dang anh
+        // no chi chua NHAC NEN (play_addr tro toi file mime_type=audio_mpeg), khong phai
+        // video that. TikTok khong cung cap ban "video ghep san" nao cho slideshow qua
+        // API nay - moi anh trong image_post_info.images deu la anh tinh (da kiem tra
+        // thuc te: bitrate_images luon null). Vi vay CHI duoc doc content.video nhu video
+        // that khi day dung la bai dang video - neu khong se nham nhac nen thanh video,
+        // nguoi dung tai ve duoc file .mp4 nhung noi dung that su la .mp3, mo khong duoc.
+        if (data.type === "video") {
+          const qualities = extractVideoQualities(rawContent.video);
+          if (qualities.length) {
+            data.videoQualities = qualities;
+            const best = pickBestQuality(qualities);
+            data.videoBest = best;
+            data.videoNoWatermark = best.url;
+            // Ban nhieu pixel nhat (thuong la ban adaptive phong to) - de nguoi dung
+            // muon thu thi co, nhung khong dat lam mac dinh.
+            const mostPixels = [...qualities].sort(
+              (a, b) => (b.width * b.height) - (a.width * a.height) || b.size - a.size
+            )[0];
+            if (mostPixels && mostPixels.url !== best.url) data.videoMostPixels = mostPixels;
+          }
         }
         // Anh goc tu raw thuong day du hon ban parsed.
         const rawImages = extractImageUrls(rawContent);
