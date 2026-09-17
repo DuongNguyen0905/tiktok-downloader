@@ -116,11 +116,30 @@ function summaryHtml(count, hint, btnLabel) {
   </div>`;
 }
 
+// CDN anh/video cua TikTok doi khi chan hotlink dua tren Referer (giong CDN video
+// - da gap khi lam proxy tai video). The <img>/<video> tay ban goi thang toi CDN
+// nen trinh duyet tu dong gui Referer la trang web cua minh -> co the bi chan
+// KHONG DEU (tuy edge server) -> hien tuong "thinh thoang loi khong hien anh".
+// Fix 2 lop: (1) referrerpolicy="no-referrer" de khong gui Referer chan duoc phan lon
+// truong hop, (2) neu van loi thi tu dong fallback sang proxy /api/download cua minh
+// (da biet chac chan hoat dong vi dung de tai file that).
+function previewFallbackAttr(rawSrc) {
+  const proxied = dlUrl(rawSrc, "preview", "image").replace(/"/g, "&quot;");
+  return `onerror="if(!this.dataset.fallback){this.dataset.fallback='1';this.src='${proxied}';}"`;
+}
+
+// The <video> khong tu tai lai khi doi src bang onerror nhu <img> - phai goi load()
+// tuong minh de trinh duyet thuc su thu lai voi src moi (ban proxy qua server).
+function videoFallbackAttr(rawSrc) {
+  const proxied = dlUrl(rawSrc, "preview", "video").replace(/"/g, "&quot;");
+  return `onerror="if(!this.dataset.fallback){this.dataset.fallback='1';this.src='${proxied}';this.load();}"`;
+}
+
 // Luoi anh: moi anh nam trong 1 the rieng, nut tai dat ngay duoi anh do.
 function imageGridHtml(images, safeName) {
   return `<div class="img-grid">${images.map((src, i) => `
     <div class="img-card">
-      <img src="${src}" loading="lazy" alt="Ảnh ${i + 1}"/>
+      <img src="${src}" loading="lazy" alt="Ảnh ${i + 1}" referrerpolicy="no-referrer" ${previewFallbackAttr(src)}/>
       <a class="btn-dl-sm" href="${dlUrl(src, safeName + "_" + (i + 1), "image")}">⬇ Tải ảnh ${i + 1}</a>
     </div>`).join("")}</div>`;
 }
@@ -154,7 +173,7 @@ function renderResult(data) {
   if (kind === "video") {
     const previewSrc = data.videoNoWatermark || data.videoWatermark;
     const qs = data.videoQualities || [];
-    html += `<video src="${previewSrc}" controls playsinline></video>`;
+    html += `<video src="${previewSrc}" controls playsinline referrerpolicy="no-referrer" ${videoFallbackAttr(previewSrc)}></video>`;
 
     if (qs.length) {
       // Server da chon san ban tot nhat (bitrate cao nhat, uu tien H.264).
@@ -189,7 +208,7 @@ function renderResult(data) {
         ${data.coverDynamic ? `<a class="btn-dl" href="${dlUrl(data.coverDynamic, safeName + "_cover_dynamic", "image")}">🌀 Ảnh bìa động</a>` : ""}
       </div>`;
   } else if (kind === "livePhoto") {
-    html += `<video src="${data.videoNoWatermark}" controls playsinline loop></video>
+    html += `<video src="${data.videoNoWatermark}" controls playsinline loop referrerpolicy="no-referrer" ${videoFallbackAttr(data.videoNoWatermark)}></video>
       ${imageGridHtml(data.images, safeName)}
       <div class="dl-row">
         <a class="btn-dl primary" href="${dlUrl(data.videoNoWatermark, safeName + "_live_photo", "video")}">⬇ Tải Live Photo (bản động)</a>
