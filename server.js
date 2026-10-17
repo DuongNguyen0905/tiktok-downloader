@@ -204,6 +204,78 @@ function normalize(raw, version) {
   return null;
 }
 
+// Cac engine ben trong thu vien (v1 = API noi bo TikTok, v2 = ssstik.io) tu dong retry
+// toi 20 LAN khi bi TikTok/CDN gioi han, KHONG co timeout rieng cho moi lan thu - gap
+// luc TikTok chan (hay xay ra voi server dat o datacenter nhu Render) co the "treo" tham
+// chi 20-30 giay cho 1 engine truoc khi bao that bai. Boc timeout rieng de cat lo som va
+// chuyen sang engine khac cho nhanh, thay vi nguoi dung phai cho het chuoi retry do.
+// Cho v1 mot khoang ngan de tra loi truoc khi dong thoi goi them engine du phong
+// (xem /api/fetch) - tranh goi du thua sang trang ngoai khi v1 von di da nhanh,
+// nhung van rut ngan dang ke thoi gian cho toi da luc TikTok dang cham/gioi han.
+const RACE_GRACE_MS = 1500;
+const RACE_TIMEOUT_MS = 8000;
+
+function withTimeout(promise, ms) {
+  let timer;
+  const timeout = new Promise((resolve) => {
+    timer = setTimeout(() => resolve({ __timedOut: true }), ms);
+  });
+  return Promise.race([Promise.resolve(promise), timeout]).finally(() => clearTimeout(timer));
+}
+
+// Lay 1 url khong watermark dau tien trong 1 "addr" tho (dang { url_list: [...] }) cua TikTok.
+function pickRawUrl(addr) {
+  if (!addr || !Array.isArray(addr.url_list)) return "";
+  return addr.url_list.find((u) => u && !hasWatermarkMark(u)) || "";
+}
+
+// Dung TRUC TIEP ket qua "raw" (showOriginalResponse) cua engine v1 - no da kem san
+// metadata DA PARSE (author/music, xem tiktokAPIDownloader.js trong thu vien) LAN noi
+// dung GOC (de lay day du cac muc chat luong video/anh). Truoc day phai goi THEM 1 lan
+// "parsed" rieng chi de lay metadata -> ton gap doi so request toi API hay bi TikTok gioi
+// han. Gop lai con 1 lan goi giup nhanh hon va it bi chan hon.
+function buildFromRawV1(raw) {
+  if (!raw || raw.status !== "success" || !raw.resultNotParsed) return null;
+  const { content, author, music } = raw.resultNotParsed;
+  if (!content) return null;
+
+  const isImage = !!content.image_post_info;
+  const data = {
+    type: isImage ? "image" : "video",
+    desc: content.desc || "",
+    author: {
+      nickname: author?.nickname || author?.uniqueId || "",
+      avatar: author?.avatarMedium?.[0] || author?.avatarThumb?.[0] || "",
+    },
+    coverStatic: pickRawUrl(content.video?.origin_cover) || pickRawUrl(content.video?.cover) || "",
+    coverDynamic: pickRawUrl(content.video?.dynamic_cover) || "",
+    videoNoWatermark: "",
+    videoWatermark: "",
+    images: extractImageUrls(content),
+    music: music?.playUrl?.[0] || "",
+  };
+
+  // Xem ghi chu o extractVideoQualities/extractImageUrls: content.video ton tai ca o bai
+  // dang anh (chi chua nhac nen) nen chi doc nhu video that khi day dung la bai dang video.
+  if (!isImage) {
+    const qualities = extractVideoQualities(content.video);
+    if (qualities.length) {
+      data.videoQualities = qualities;
+      const best = pickBestQuality(qualities);
+      data.videoBest = best;
+      data.videoNoWatermark = best.url;
+      // Ban nhieu pixel nhat (thuong la ban adaptive phong to) - de nguoi dung
+      // muon thu thi co, nhung khong dat lam mac dinh.
+      const mostPixels = [...qualities].sort(
+        (a, b) => (b.width * b.height) - (a.width * a.height) || b.size - a.size
+      )[0];
+      if (mostPixels && mostPixels.url !== best.url) data.videoMostPixels = mostPixels;
+    }
+  }
+
+  return data;
+}
+
 // Endpoint sieu nhe danh cho dich vu ping ben ngoai (cron) goi dinh ky, giup
 // server tren goi free khong "ngu" -> nguoi dung khong phai doi ~50s khi vao trang.
 // Khong doc file, khong goi TikTok, chi tra ve 1 dong text.
@@ -222,7 +294,48 @@ function extractTiktokUrl(input) {
   return match[0].replace(/[)\]}>,;.!?"'“”‘’。，！？]+$/, "");
 }
 
-// Thu lan luot nhieu "engine" (v1 -> v3 -> v2) vi TikTok hay doi cau truc, engine nay hong thi dung engine khac.
+function isUsableResult(data) {
+  return !!(data && (data.videoNoWatermark || data.videoWatermark || (data.images && data.images.length)));
+}
+
+// Goi 1 engine, gioi han thoi gian, va tra ve null (khong bao gio reject) khi that bai/
+// qua thoi gian cho - de dung duoc chung voi raceFirstUsable ben duoi.
+function runEngine(url, version, onError) {
+  const callOpts = version === "v1" ? { version: "v1", showOriginalResponse: true } : { version };
+  return withTimeout(Tiktok.Downloader(url, callOpts), RACE_TIMEOUT_MS)
+    .then((raw) => {
+      if (raw && raw.__timedOut) {
+        onError(`Engine ${version} qua thoi gian cho.`);
+        return null;
+      }
+      const data = version === "v1" ? buildFromRawV1(raw) : normalize(raw, version);
+      if (!isUsableResult(data)) {
+        onError(raw?.message || `Khong lay duoc du lieu tu ${version}`);
+        return null;
+      }
+      return { version, data };
+    })
+    .catch((err) => {
+      onError(err?.message);
+      return null;
+    });
+}
+
+// Dua vao mang promise (khong bao gio reject, tra null neu that bai) - tra ve ket qua
+// HOP LE dau tien xong truoc, khong doi cac promise con lai.
+function raceFirstUsable(promises) {
+  return new Promise((resolve) => {
+    let remaining = promises.length;
+    promises.forEach((p) => {
+      p.then((result) => {
+        remaining--;
+        if (result) resolve(result);
+        else if (remaining === 0) resolve(null);
+      });
+    });
+  });
+}
+
 app.post("/api/fetch", fetchLimiter, async (req, res) => {
   const { url: rawInput } = req.body || {};
   const url = extractTiktokUrl(rawInput);
@@ -230,76 +343,31 @@ app.post("/api/fetch", fetchLimiter, async (req, res) => {
     return res.status(400).json({ error: "Khong tim thay link TikTok hop le trong noi dung ban dan vao." });
   }
 
-  let lastError = "";
+  let lastError = "Khong lay duoc du lieu.";
+  const setError = (msg) => { if (msg) lastError = msg; };
 
-  // Engine v1 truoc: goi SONG SONG 2 dang de khong cham hon.
-  //  - ban parsed: co day du metadata (tac gia, mo ta, nhac, anh bia)
-  //  - ban raw (showOriginalResponse): rong metadata NHUNG chua danh sach cac muc chat luong
-  // Ghep 2 ban lai moi co du "metadata day du + chat luong cao nhat".
-  try {
-    const [parsedR, rawR] = await Promise.allSettled([
-      Tiktok.Downloader(url, { version: "v1" }),
-      Tiktok.Downloader(url, { version: "v1", showOriginalResponse: true }),
+  // v1 (API TikTok that) duoc uu tien goi truoc - thuong nhanh nhat va cho day du cac
+  // muc chat luong video. Chi cho no 1 khoang ngan (RACE_GRACE_MS); neu chua xong (TikTok
+  // dang cham/gioi han) thi goi THEM 2 engine du phong (v3, v2) chay SONG SONG voi v1 dang
+  // cho, roi dung engine nao co ket qua hop le ve truoc tien. Cach nay nhanh hon han kieu
+  // "cho het v1 roi moi thu engine khac" truoc day, ma van tranh goi du thua sang 2 trang
+  // ngoai (musicaldown/ssstik) trong truong hop v1 von di da tra loi nhanh.
+  const v1Promise = runEngine(url, "v1", setError);
+  let winner = await Promise.race([
+    v1Promise,
+    new Promise((resolve) => setTimeout(() => resolve(undefined), RACE_GRACE_MS)),
+  ]);
+
+  if (!winner) {
+    winner = await raceFirstUsable([
+      v1Promise,
+      runEngine(url, "v3", setError),
+      runEngine(url, "v2", setError),
     ]);
-
-    const parsed = parsedR.status === "fulfilled" ? parsedR.value : null;
-    const data = normalize(parsed, "v1");
-
-    if (data) {
-      const rawContent =
-        rawR.status === "fulfilled" && rawR.value?.resultNotParsed?.content
-          ? rawR.value.resultNotParsed.content
-          : null;
-
-      if (rawContent) {
-        // QUAN TRONG: content.video TON TAI CHO CA BAI DANG ANH, nhung voi bai dang anh
-        // no chi chua NHAC NEN (play_addr tro toi file mime_type=audio_mpeg), khong phai
-        // video that. TikTok khong cung cap ban "video ghep san" nao cho slideshow qua
-        // API nay - moi anh trong image_post_info.images deu la anh tinh (da kiem tra
-        // thuc te: bitrate_images luon null). Vi vay CHI duoc doc content.video nhu video
-        // that khi day dung la bai dang video - neu khong se nham nhac nen thanh video,
-        // nguoi dung tai ve duoc file .mp4 nhung noi dung that su la .mp3, mo khong duoc.
-        if (data.type === "video") {
-          const qualities = extractVideoQualities(rawContent.video);
-          if (qualities.length) {
-            data.videoQualities = qualities;
-            const best = pickBestQuality(qualities);
-            data.videoBest = best;
-            data.videoNoWatermark = best.url;
-            // Ban nhieu pixel nhat (thuong la ban adaptive phong to) - de nguoi dung
-            // muon thu thi co, nhung khong dat lam mac dinh.
-            const mostPixels = [...qualities].sort(
-              (a, b) => (b.width * b.height) - (a.width * a.height) || b.size - a.size
-            )[0];
-            if (mostPixels && mostPixels.url !== best.url) data.videoMostPixels = mostPixels;
-          }
-        }
-        // Anh goc tu raw thuong day du hon ban parsed.
-        const rawImages = extractImageUrls(rawContent);
-        if (rawImages.length >= (data.images?.length || 0)) data.images = rawImages;
-      }
-
-      if (data.videoNoWatermark || data.videoWatermark || data.images.length) {
-        return res.json({ ok: true, engine: rawContent ? "v1+raw" : "v1", data });
-      }
-    }
-    lastError = parsed?.message || "Khong lay duoc du lieu tu v1";
-  } catch (err) {
-    lastError = err.message;
   }
 
-  // v1 that bai thi thu cac engine con lai (khong co thong tin chat luong chi tiet).
-  for (const version of ["v3", "v2"]) {
-    try {
-      const raw = await Tiktok.Downloader(url, { version });
-      const data = normalize(raw, version);
-      if (data && (data.videoNoWatermark || data.videoWatermark || data.images.length)) {
-        return res.json({ ok: true, engine: version, data });
-      }
-      lastError = raw?.message || "Khong lay duoc du lieu";
-    } catch (err) {
-      lastError = err.message;
-    }
+  if (winner) {
+    return res.json({ ok: true, engine: winner.version, data: winner.data });
   }
   res.status(502).json({ error: "Khong lay duoc video/anh. TikTok co the da doi cau truc hoac link khong hop le.", detail: lastError });
 });
