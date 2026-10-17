@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<meta name="color-scheme" content="light" />
+<meta name="color-scheme" content="light dark" />
 <meta name="robots" content="noindex, nofollow" />
 <title>TikSave · Tải video / ảnh TikTok</title>
 <style>
@@ -401,9 +401,89 @@
     background: rgba(255, 240, 245, 0.52);
     color: var(--danger-ink);
   }
+  .status-actions { margin-top: 12px; }
+  .status-actions .btn-dl-sm {
+    display: inline-block;
+    width: auto;
+    padding: 9px 18px;
+  }
 
   /* Trang thai loi nam trong the ket qua thi gon lai */
   .result-card > .status { margin-top: 4px; }
+
+  /* ---------- 6b. LICH SU LINK VUA TAI (localStorage) ---------- */
+
+  .history-wrap { margin-top: 14px; }
+  .history-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    padding: 0 4px;
+  }
+  .history-title {
+    font-size: 12.5px;
+    font-weight: 650;
+    color: var(--ink-2);
+  }
+  .history-clear {
+    border: none;
+    background: transparent;
+    color: var(--ink-2);
+    font-family: inherit;
+    font-size: 11.5px;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+  .history-clear:hover { color: var(--danger-ink); }
+
+  .history-list {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding: 2px 2px 6px;
+  }
+  .history-item {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 180px;
+    padding: 7px 8px 7px 11px;
+    border-radius: 999px;
+    border: 1px solid var(--glass-line-2);
+    background: rgba(255, 255, 255, 0.42);
+    cursor: pointer;
+    transition: background 0.24s var(--ease), transform 0.24s var(--ease);
+  }
+  .history-item:hover {
+    background: rgba(255, 255, 255, 0.72);
+    transform: translateY(-1px);
+  }
+  .history-item .h-icon { flex: 0 0 auto; font-size: 14px; }
+  .history-item .h-name {
+    font-size: 12px;
+    font-weight: 650;
+    color: var(--ink);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .history-item .h-remove {
+    flex: 0 0 auto;
+    width: 17px; height: 17px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 50%;
+    background: rgba(27, 23, 48, 0.12);
+    color: var(--ink-2);
+    font-size: 11px;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .history-item .h-remove:hover { background: rgba(179, 18, 63, 0.3); color: var(--danger-ink); }
 
   /* ---------- 7. THE KET QUA ---------- */
 
@@ -714,6 +794,102 @@
     .blob          { opacity: 0.55; }
   }
 
+  /* ---------- 12b. DARK MODE (theo giao dien he thong) ---------- */
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --base:        #120e20;
+      --ink:         #f1edfb;
+      --ink-2:       #b7b0d6;
+      --violet-ink:  #c3a8ff;
+      --danger-ink:  #ff93b3;
+
+      --glass:       rgba(40, 32, 62, 0.46);
+      --glass-soft:  rgba(40, 32, 62, 0.34);
+      --glass-deep:  rgba(40, 32, 62, 0.60);
+      --glass-line:  rgba(255, 255, 255, 0.14);
+      --glass-line-2:rgba(255, 255, 255, 0.10);
+
+      --shadow-lg:
+        0 24px 60px -18px rgba(0, 0, 0, 0.55),
+        0 8px 24px -12px rgba(0, 0, 0, 0.40);
+      --shadow-md:
+        0 14px 34px -14px rgba(0, 0, 0, 0.50),
+        0 4px 12px -6px rgba(0, 0, 0, 0.35);
+      --inset-top:
+        inset 0 1px 0 rgba(255, 255, 255, 0.14),
+        inset 0 -1px 0 rgba(255, 255, 255, 0.04);
+    }
+
+    /* Aurora dich lai gan nhu mot vang sang tren nen toi thay vi lop rua mau pastel. */
+    .blob { opacity: 0.6; }
+
+    .glass::before,
+    .result-card::before {
+      background:
+        linear-gradient(158deg,
+          rgba(255, 255, 255, 0.16) 0%,
+          rgba(255, 255, 255, 0.05) 26%,
+          rgba(255, 255, 255, 0.00) 52%),
+        radial-gradient(120% 70% at 12% -10%,
+          rgba(255, 255, 255, 0.14) 0%,
+          rgba(255, 255, 255, 0.00) 60%);
+    }
+
+    .notice        { background: rgba(40, 32, 62, 0.38); }
+
+    input[type="text"] {
+      background: rgba(40, 32, 62, 0.55);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.08),
+        inset 0 2px 10px rgba(0, 0, 0, 0.28);
+    }
+    input[type="text"]::placeholder { color: #938cb8; }
+    input[type="text"]:hover  { background: rgba(40, 32, 62, 0.66); }
+    input[type="text"]:focus  {
+      background: rgba(40, 32, 62, 0.76);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.10),
+        0 0 0 4px rgba(159, 122, 255, 0.28),
+        0 10px 26px -14px rgba(0, 0, 0, 0.55);
+    }
+
+    .btn-paste        { background: rgba(40, 32, 62, 0.52); }
+    .btn-paste:hover  { background: rgba(40, 32, 62, 0.74); }
+
+    .hint code { background: rgba(40, 32, 62, 0.5); }
+
+    .status.error {
+      border-color: rgba(255, 147, 179, 0.4);
+      background: rgba(80, 22, 40, 0.48);
+    }
+
+    .type-badge    { background: rgba(40, 32, 62, 0.55); }
+    .result-head   { background: rgba(40, 32, 62, 0.40); }
+    .result-head img {
+      background: rgba(40, 32, 62, 0.6);
+      box-shadow:
+        0 0 0 2px rgba(255, 255, 255, 0.18),
+        0 6px 16px -6px rgba(0, 0, 0, 0.6);
+    }
+
+    .media-summary { background: rgba(40, 32, 62, 0.46); }
+    .img-card        { background: rgba(40, 32, 62, 0.40); }
+    .img-card:hover  { background: rgba(40, 32, 62, 0.58); }
+    .img-card img,
+    .img-grid img    { background: rgba(40, 32, 62, 0.5); }
+
+    .btn-dl          { background: rgba(40, 32, 62, 0.50); }
+    .btn-dl:hover    { background: rgba(40, 32, 62, 0.74); border-color: rgba(255, 255, 255, 0.3); }
+    .btn-dl-sm       { background: rgba(40, 32, 62, 0.50); }
+    .btn-dl-sm:hover { background: rgba(40, 32, 62, 0.80); }
+
+    .history-item          { background: rgba(40, 32, 62, 0.45); }
+    .history-item:hover    { background: rgba(40, 32, 62, 0.70); }
+    .history-item .h-remove{ background: rgba(255, 255, 255, 0.12); }
+    .history-item .h-remove:hover { background: rgba(255, 147, 179, 0.3); }
+  }
+
   /* ---------- 13. GIAM CHUYEN DONG ---------- */
 
   @media (prefers-reduced-motion: reduce) {
@@ -773,6 +949,14 @@
       </div>
 
     </section>
+
+    <div class="history-wrap" id="history-wrap" hidden>
+      <div class="history-head">
+        <span class="history-title">🕘 Lịch sử gần đây</span>
+        <button type="button" class="history-clear" id="history-clear">Xoá hết</button>
+      </div>
+      <div class="history-list" id="history-list"></div>
+    </div>
 
     <div id="output"></div>
 

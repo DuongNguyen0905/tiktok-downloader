@@ -31,6 +31,19 @@ async function handlePaste() {
   }
 }
 
+// Hien loi kem nut "Thu lai" - bam vao se goi lai handleFetch() voi link dang co san
+// trong o nhap (o nhap khong bi xoa khi loi), khong phai tu dan lai link.
+function renderError(message, detail) {
+  output.innerHTML = `<div class="status error">
+    ❌ ${escapeHtml(message)}${detail ? `<br><small>${escapeHtml(detail)}</small>` : ""}
+    <div class="status-actions">
+      <button type="button" class="btn-dl-sm" id="retry-btn">🔄 Thử lại</button>
+    </div>
+  </div>`;
+  const retryBtn = document.getElementById("retry-btn");
+  if (retryBtn) retryBtn.addEventListener("click", handleFetch);
+}
+
 async function handleFetch() {
   const url = urlInput.value.trim();
   if (!url) return;
@@ -46,12 +59,13 @@ async function handleFetch() {
     });
     const json = await res.json();
     if (!res.ok || !json.ok) {
-      output.innerHTML = `<div class="status error">❌ ${escapeHtml(json.error || "Có lỗi xảy ra.")}${json.detail ? `<br><small>${escapeHtml(json.detail)}</small>` : ""}</div>`;
+      renderError(json.error || "Có lỗi xảy ra.", json.detail);
       return;
     }
     renderResult(json.data);
+    saveToHistory(url, json.data);
   } catch (err) {
-    output.innerHTML = `<div class="status error">❌ Lỗi kết nối: ${escapeHtml(err.message)}</div>`;
+    renderError("Lỗi kết nối: " + err.message);
   } finally {
     fetchBtn.disabled = false;
   }
@@ -254,3 +268,100 @@ function escapeHtml(str) {
   div.textContent = str;
   return div.innerHTML;
 }
+
+/* ============================================================
+   LICH SU LINK VUA TAI (luu trong localStorage cua trinh duyet,
+   khong gui len server) - bam vao 1 muc de dien lai link va tai lai.
+   ============================================================ */
+
+const HISTORY_KEY = "tiksave_history_v1";
+const HISTORY_LIMIT = 12;
+const historyWrap = document.getElementById("history-wrap");
+const historyList = document.getElementById("history-list");
+const historyClearBtn = document.getElementById("history-clear");
+
+function loadHistory() {
+  try {
+    const raw = localStorage.getItem(HISTORY_KEY);
+    const list = raw ? JSON.parse(raw) : [];
+    return Array.isArray(list) ? list : [];
+  } catch {
+    // localStorage co the bi chan (che do an danh, quyen trinh duyet...) - bo qua lich su.
+    return [];
+  }
+}
+
+function persistHistory(list) {
+  try {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(list));
+  } catch {
+    // Bo qua neu khong luu duoc - khong lam gian doan chuc nang tai chinh.
+  }
+}
+
+function saveToHistory(url, data) {
+  const entry = {
+    url,
+    type: data.type,
+    nickname: data.author?.nickname || "TikTok",
+    savedAt: Date.now(),
+  };
+  let list = loadHistory().filter((it) => it.url !== url);
+  list.unshift(entry);
+  list = list.slice(0, HISTORY_LIMIT);
+  persistHistory(list);
+  renderHistory();
+}
+
+function removeFromHistory(url) {
+  persistHistory(loadHistory().filter((it) => it.url !== url));
+  renderHistory();
+}
+
+function clearHistory() {
+  persistHistory([]);
+  renderHistory();
+}
+
+function renderHistory() {
+  if (!historyWrap || !historyList) return;
+  const list = loadHistory();
+  historyWrap.hidden = list.length === 0;
+  historyList.innerHTML = "";
+
+  list.forEach((item) => {
+    const chip = document.createElement("div");
+    chip.className = "history-item";
+    chip.title = item.url;
+
+    const icon = document.createElement("span");
+    icon.className = "h-icon";
+    icon.textContent = item.type === "image" ? "🖼️" : "🎬";
+
+    const name = document.createElement("span");
+    name.className = "h-name";
+    name.textContent = item.nickname || "TikTok";
+
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "h-remove";
+    remove.title = "Bỏ khỏi lịch sử";
+    remove.textContent = "×";
+    remove.addEventListener("click", (e) => {
+      e.stopPropagation();
+      removeFromHistory(item.url);
+    });
+
+    chip.addEventListener("click", () => {
+      urlInput.value = item.url;
+      handleFetch();
+    });
+
+    chip.append(icon, name, remove);
+    historyList.appendChild(chip);
+  });
+}
+
+if (historyClearBtn) historyClearBtn.addEventListener("click", clearHistory);
+
+renderHistory();
