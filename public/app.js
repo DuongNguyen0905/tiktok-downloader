@@ -3,15 +3,46 @@ const fetchBtn = document.getElementById("fetch-btn");
 const pasteBtn = document.getElementById("paste-btn");
 const resetBtn = document.getElementById("reset-btn");
 const output = document.getElementById("output");
+const wakeBanner = document.getElementById("wake-banner");
 
 fetchBtn.addEventListener("click", handleFetch);
-urlInput.addEventListener("keydown", (e) => { if (e.key === "Enter") handleFetch(); });
+// Enter xuong dong binh thuong (can de go/dan nhieu link, moi dong 1 cai). Ctrl/Cmd+Enter
+// moi la phim tat de gui luon, cho ai quen thao tac nhanh bang ban phim.
+urlInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+    e.preventDefault();
+    handleFetch();
+  }
+});
+urlInput.addEventListener("input", autoResizeUrlInput);
 pasteBtn.addEventListener("click", handlePaste);
 if (resetBtn) resetBtn.addEventListener("click", handleReset);
+
+// O nhap la <textarea> de ho tro dan nhieu link (moi dong 1 cai) nhung van trong giong
+// 1 o input binh thuong khi chi co 1 dong - tu phong chieu cao theo noi dung go/dan vao.
+function autoResizeUrlInput() {
+  urlInput.style.height = "auto";
+  urlInput.style.height = Math.min(urlInput.scrollHeight, 220) + "px";
+}
+autoResizeUrlInput();
+
+// Render goi free-tier: server tu "ngu" sau mot thoi gian khong ai dung, request dau
+// tien sau do co the mat ~30-50s de "thuc day". Ping /healthz ngay khi mo trang de danh
+// thuc truoc, va CHI hien canh bao neu that su cham (qua nguong) - tranh hien banner
+// thua khi server von di dang thuc san (truong hop binh thuong, pho bien hon).
+(function wakeServer() {
+  if (!wakeBanner) return;
+  const showTimer = setTimeout(() => { wakeBanner.hidden = false; }, 2500);
+  fetch("/healthz").catch(() => {}).finally(() => {
+    clearTimeout(showTimer);
+    wakeBanner.hidden = true;
+  });
+})();
 
 // Xoa ket qua cu + o nhap de dan link moi ma khong phai tai lai trang.
 function handleReset() {
   urlInput.value = "";
+  autoResizeUrlInput();
   output.innerHTML = "";
   urlInput.focus();
 }
@@ -21,6 +52,7 @@ async function handlePaste() {
     const text = await navigator.clipboard.readText();
     if (text) {
       urlInput.value = text;
+      autoResizeUrlInput();
       urlInput.focus();
       handleFetch(); // dan xong tu dong lay luon cho nhanh
     }
@@ -44,12 +76,39 @@ function renderError(message, detail) {
   if (retryBtn) retryBtn.addEventListener("click", handleFetch);
 }
 
-async function handleFetch() {
-  const url = urlInput.value.trim();
-  if (!url) return;
+// Tach 1 doan text thanh nhieu link TikTok rieng biet - CHI khi TUNG DONG deu tu chua 1
+// link TikTok (vd dan nhieu link, moi dong 1 cai). Neu chi 1 dong duy nhat co link (vd
+// dan nguyen tin nhan chia se nhieu dong nhung chi 1 link ben trong), giu nguyen ca doan
+// nhu 1 link duy nhat - tranh hieu nham thanh "nhieu link" ma hau het se bi loi.
+function splitTiktokLinks(text) {
+  const lines = text.split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+  const tiktokLines = lines.filter((l) => /tiktok\.com/i.test(l));
+  if (tiktokLines.length >= 2) return tiktokLines;
+  return [text.trim()];
+}
 
+function handleFetch() {
+  const raw = urlInput.value.trim();
+  if (!raw) return;
+
+  const urls = splitTiktokLinks(raw);
+  if (urls.length > 1) return fetchBatch(urls);
+  return fetchSingle(urls[0]);
+}
+
+async function fetchSingle(url) {
   fetchBtn.disabled = true;
   output.innerHTML = `<div class="status">⏳ Đang lấy dữ liệu từ TikTok...</div>`;
+
+  // Neu lau hon binh thuong thi goi y ly do (server moi khoi dong lai / TikTok dang
+  // gioi han) de nguoi dung yen tam cho thay vi tuong app bi treo.
+  const slowHintTimer = setTimeout(() => {
+    const statusEl = output.querySelector(".status");
+    if (statusEl) {
+      statusEl.innerHTML = `⏳ Đang lấy dữ liệu từ TikTok...
+        <small>Hơi lâu hơn bình thường — có thể do server mới khởi động lại hoặc TikTok đang giới hạn truy cập, vui lòng chờ thêm chút.</small>`;
+    }
+  }, 6000);
 
   try {
     const res = await fetch("/api/fetch", {
@@ -67,8 +126,69 @@ async function handleFetch() {
   } catch (err) {
     renderError("Lỗi kết nối: " + err.message);
   } finally {
+    clearTimeout(slowHintTimer);
     fetchBtn.disabled = false;
   }
+}
+
+// Xu ly 1 link va cap nhat ngay vao `container` cua no trong hang doi (thay the bang
+// the ket qua neu thanh cong, hoac bao loi kem nut "thu lai" rieng cho link do neu that
+// bai - thu lai 1 link khong anh huong cac link khac trong hang doi).
+async function fetchOneAndAppend(url, container) {
+  container.className = "status";
+  container.textContent = "⏳ Đang lấy dữ liệu...";
+  try {
+    const res = await fetch("/api/fetch", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url }),
+    });
+    const json = await res.json();
+    if (!res.ok || !json.ok) {
+      renderBatchItemError(container, url, json.error || "Có lỗi xảy ra.", json.detail);
+      return;
+    }
+    container.replaceWith(createResultCardElement(json.data));
+    saveToHistory(url, json.data);
+  } catch (err) {
+    renderBatchItemError(container, url, "Lỗi kết nối: " + err.message);
+  }
+}
+
+function renderBatchItemError(container, url, message, detail) {
+  const shortUrl = url.length > 70 ? url.slice(0, 70) + "…" : url;
+  container.className = "status error";
+  container.innerHTML = `❌ <small>${escapeHtml(shortUrl)}</small><br>${escapeHtml(message)}${detail ? `<br><small>${escapeHtml(detail)}</small>` : ""}
+    <div class="status-actions">
+      <button type="button" class="btn-dl-sm retry-one">🔄 Thử lại link này</button>
+    </div>`;
+  const retryBtn = container.querySelector(".retry-one");
+  if (retryBtn) retryBtn.addEventListener("click", () => fetchOneAndAppend(url, container));
+}
+
+// Dan nhieu link (moi dong 1 cai) duoc xu ly LAN LUOT (khong dong thoi) de khong vuot
+// rate limit cua server va cua chinh TikTok/cac trang du phong. Tao san hang doi "dang
+// cho" de thay ngay co bao nhieu link se duoc xu ly, roi lan luot thay the tung cai.
+async function fetchBatch(urls) {
+  fetchBtn.disabled = true;
+  const origLabel = fetchBtn.textContent;
+  output.innerHTML = "";
+
+  const containers = urls.map((url) => {
+    const div = document.createElement("div");
+    div.className = "status";
+    div.textContent = "⏳ Đang chờ...";
+    output.appendChild(div);
+    return div;
+  });
+
+  for (let i = 0; i < urls.length; i++) {
+    fetchBtn.textContent = `⏳ Đang xử lý ${i + 1}/${urls.length}...`;
+    await fetchOneAndAppend(urls[i], containers[i]);
+  }
+
+  fetchBtn.disabled = false;
+  fetchBtn.textContent = origLabel;
 }
 
 function dlUrl(src, name, type) {
@@ -126,7 +246,7 @@ const KIND_META = {
 function summaryHtml(count, hint, btnLabel) {
   return `<div class="media-summary">
     <div class="count">📸 Tìm thấy ${count} ảnh<small>${hint}</small></div>
-    <button class="btn-dl primary" id="dl-all-images">${btnLabel}</button>
+    <button class="btn-dl primary dl-all-images">${btnLabel}</button>
   </div>`;
 }
 
@@ -158,7 +278,10 @@ function imageGridHtml(images, safeName) {
     </div>`).join("")}</div>`;
 }
 
-function renderResult(data) {
+// Dung lai HTML tho cua 1 the ket qua (khong gan vao trang) - de dung chung cho ca tai
+// 1 link (thay het noi dung #output) lan tai nhieu link (them 1 the moi vao hang doi,
+// #output luc nay co the dang chua nhieu the khac).
+function buildResultHtml(data) {
   const safeName = (data.author.nickname || "tiktok").replace(/[^\w\-]/g, "_");
   const kind = classifyKind(data);
   const meta = KIND_META[kind];
@@ -233,12 +356,28 @@ function renderResult(data) {
   }
 
   html += `</div>`;
-  output.innerHTML = html;
+  return html;
+}
 
-  const allBtn = document.getElementById("dl-all-images");
+// Dung class thay vi id cho nut "Tai tat ca anh" vi khi tai nhieu link co the co NHIEU
+// the ket qua (nhieu bai dang anh) cung luc tren trang - id trung nhau se chi bat duoc
+// nut dau tien.
+function createResultCardElement(data) {
+  const wrapper = document.createElement("div");
+  wrapper.innerHTML = buildResultHtml(data);
+  const card = wrapper.firstElementChild;
+
+  const allBtn = card.querySelector(".dl-all-images");
   if (allBtn) {
+    const safeName = (data.author.nickname || "tiktok").replace(/[^\w\-]/g, "_");
     allBtn.addEventListener("click", () => downloadAllImages(data.images, safeName, allBtn));
   }
+  return card;
+}
+
+function renderResult(data) {
+  output.innerHTML = "";
+  output.appendChild(createResultCardElement(data));
 }
 
 // Tai lan luot tung anh (co gian cach nho) de trinh duyet khong chan tai hang loat cung luc.
