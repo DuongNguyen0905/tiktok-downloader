@@ -263,6 +263,41 @@
     text-align: center;
   }
 
+  /* ---------- 4c. TABS (chon 1 trong 2 chuc nang) ---------- */
+
+  .tabs {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 16px;
+    padding: 5px;
+    border-radius: var(--r-lg);
+    border: 1px solid var(--glass-line);
+    background: var(--glass-soft);
+    -webkit-backdrop-filter: var(--blur-sm);
+    backdrop-filter: var(--blur-sm);
+    box-shadow: var(--inset-top);
+  }
+  .tab-btn {
+    flex: 1 1 0;
+    padding: 11px 10px;
+    border: none;
+    border-radius: var(--r-md);
+    background: transparent;
+    color: var(--ink-2);
+    font-size: 13.5px;
+    font-weight: 650;
+    text-align: center;
+    transition: background 0.26s var(--ease), color 0.26s var(--ease), box-shadow 0.26s var(--ease);
+  }
+  .tab-btn:hover { color: var(--ink); background: rgba(255, 255, 255, 0.3); }
+  .tab-btn.active {
+    color: #fff;
+    background: linear-gradient(135deg, #6f45c9 0%, #8b46bf 46%, #a94a9d 100%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.32), 0 10px 22px -12px rgba(97, 55, 172, 0.55);
+  }
+  .tab-btn.active:hover { color: #fff; background: linear-gradient(135deg, #6f45c9 0%, #8b46bf 46%, #a94a9d 100%); }
+  .tab-panel[hidden] { display: none; }
+
   /* ---------- 5. FORM ---------- */
 
   .form-row {
@@ -763,6 +798,74 @@
   }
   .btn-dl-sm:active { transform: scale(0.97); }
 
+  /* ---------- 9b. LIVE PHOTO -> VIDEO ---------- */
+
+  .lp-panel { margin-top: 18px; }
+
+  .lp-pick-btn {
+    flex: 1 1 260px;
+    min-width: 0;
+    justify-content: flex-start;
+    text-align: left;
+  }
+
+  .lp-filelist {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    margin-top: 12px;
+  }
+  .lp-file-chip {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 9px 13px;
+    border-radius: var(--r-md);
+    border: 1px solid var(--glass-line-2);
+    background: rgba(255, 255, 255, 0.32);
+    font-size: 12.5px;
+    color: var(--ink-2);
+  }
+  .lp-file-chip b {
+    color: var(--ink);
+    font-weight: 650;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .lp-file-chip .lp-remove {
+    flex: 0 0 auto;
+    width: 20px; height: 20px;
+    display: flex; align-items: center; justify-content: center;
+    border: none;
+    border-radius: 50%;
+    background: rgba(27, 23, 48, 0.12);
+    color: var(--ink-2);
+    font-size: 12px;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .lp-file-chip .lp-remove:hover { background: rgba(179, 18, 63, 0.25); color: var(--danger-ink); }
+
+  .lp-result { margin-bottom: 14px; }
+  .lp-result:last-child { margin-bottom: 0; }
+  .lp-result-name {
+    font-size: 13px;
+    font-weight: 650;
+    color: var(--ink);
+    margin-bottom: 8px;
+  }
+  .lp-result video {
+    display: block;
+    width: 100%;
+    margin-bottom: 12px;
+    border-radius: var(--r-lg);
+    border: 1px solid var(--glass-line-2);
+    background: #17122a;
+    box-shadow: var(--shadow-md);
+  }
+
   /* ---------- 10. FOOTER ---------- */
 
   footer {
@@ -785,6 +888,7 @@
     .btn-dl { flex: 1 1 100%; }
     .media-summary .btn-dl { flex: 1 1 100%; }
     .img-grid { grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 10px; }
+    .lp-pick-btn { flex: 1 1 100%; }
   }
 
   @media (max-width: 380px) {
@@ -858,6 +962,9 @@
     .notice        { background: rgba(40, 32, 62, 0.38); }
     .wake-banner   { border-color: rgba(255, 190, 120, 0.4); background: rgba(90, 60, 24, 0.4); }
 
+    .tabs          { background: rgba(40, 32, 62, 0.36); }
+    .tab-btn:hover { background: rgba(40, 32, 62, 0.55); color: var(--ink); }
+
     .url-field {
       background: rgba(40, 32, 62, 0.55);
       box-shadow:
@@ -908,6 +1015,10 @@
     .history-item:hover    { background: rgba(40, 32, 62, 0.70); }
     .history-item .h-remove{ background: rgba(255, 255, 255, 0.12); }
     .history-item .h-remove:hover { background: rgba(255, 147, 179, 0.3); }
+
+    .lp-file-chip         { background: rgba(40, 32, 62, 0.42); }
+    .lp-file-chip .lp-remove { background: rgba(255, 255, 255, 0.12); }
+    .lp-file-chip .lp-remove:hover { background: rgba(255, 147, 179, 0.3); }
   }
 
   /* ---------- 13. GIAM CHUYEN DONG ---------- */
@@ -946,46 +1057,91 @@
       lần tải đầu có thể mất khoảng 30–50 giây, các lần sau sẽ nhanh bình thường.
     </div>
 
-    <section class="glass panel">
+    <div class="tabs" role="tablist" aria-label="Chọn chức năng">
+      <button type="button" class="tab-btn" id="tab-btn-tiktok" role="tab" aria-selected="false">⬇️ Tải TikTok</button>
+      <button type="button" class="tab-btn" id="tab-btn-livephoto" role="tab" aria-selected="false">🎬 Live Photo → Video</button>
+    </div>
 
-      <div class="notice">
-        <span class="ico" aria-hidden="true">⚠️</span>
-        <span>
-          <b>Chỉ tải nội dung bạn sở hữu hoặc được phép lưu lại</b> (video của chính bạn, lưu offline
-          để xem sau…). Tôn trọng bản quyền và ghi công tác giả gốc khi chia sẻ lại — đừng đăng
-          nội dung của người khác như của mình.
-        </span>
-      </div>
+    <section id="tab-panel-tiktok" class="tab-panel" hidden>
 
-      <div class="form-row">
-        <textarea
-          class="url-field"
-          id="url-input"
-          rows="1"
-          autocomplete="off"
-          spellcheck="false"
-          inputmode="url"
-          placeholder="Dán link TikTok... (dán nhiều link, mỗi dòng một cái, để tải hàng loạt)"
-          aria-label="Link TikTok, có thể dán nhiều link mỗi dòng một cái để tải hàng loạt"
-        ></textarea>
-        <div class="btn-group">
-          <button type="button" class="btn-paste" id="paste-btn" title="Dán từ clipboard">📋 Dán</button>
-          <button type="button" class="btn-primary" id="fetch-btn">Lấy về</button>
-          <button type="button" class="btn-paste" id="reset-btn" title="Xoá để dán link khác">🔄 Link khác</button>
+      <section class="glass panel">
+
+        <div class="notice">
+          <span class="ico" aria-hidden="true">⚠️</span>
+          <span>
+            <b>Chỉ tải nội dung bạn sở hữu hoặc được phép lưu lại</b> (video của chính bạn, lưu offline
+            để xem sau…). Tôn trọng bản quyền và ghi công tác giả gốc khi chia sẻ lại — đừng đăng
+            nội dung của người khác như của mình.
+          </span>
         </div>
+
+        <div class="form-row">
+          <textarea
+            class="url-field"
+            id="url-input"
+            rows="1"
+            autocomplete="off"
+            spellcheck="false"
+            inputmode="url"
+            placeholder="Dán link TikTok... (dán nhiều link, mỗi dòng một cái, để tải hàng loạt)"
+            aria-label="Link TikTok, có thể dán nhiều link mỗi dòng một cái để tải hàng loạt"
+          ></textarea>
+          <div class="btn-group">
+            <button type="button" class="btn-paste" id="paste-btn" title="Dán từ clipboard">📋 Dán</button>
+            <button type="button" class="btn-primary" id="fetch-btn">Lấy về</button>
+            <button type="button" class="btn-paste" id="reset-btn" title="Xoá để dán link khác">🔄 Link khác</button>
+          </div>
+        </div>
+
+      </section>
+
+      <div class="history-wrap" id="history-wrap" hidden>
+        <div class="history-head">
+          <span class="history-title">🕘 Lịch sử gần đây</span>
+          <button type="button" class="history-clear" id="history-clear">Xoá hết</button>
+        </div>
+        <div class="history-list" id="history-list"></div>
       </div>
+
+      <div id="output"></div>
 
     </section>
 
-    <div class="history-wrap" id="history-wrap" hidden>
-      <div class="history-head">
-        <span class="history-title">🕘 Lịch sử gần đây</span>
-        <button type="button" class="history-clear" id="history-clear">Xoá hết</button>
-      </div>
-      <div class="history-list" id="history-list"></div>
-    </div>
+    <section id="tab-panel-livephoto" class="tab-panel" hidden>
 
-    <div id="output"></div>
+      <section class="glass panel lp-panel">
+
+        <div class="notice">
+          <span class="ico" aria-hidden="true">🎬</span>
+          <span>
+            <b>Chuyển Live Photo / Motion Photo thành video .mp4 — chọn được nhiều ảnh cùng lúc</b> —
+            hỗ trợ cả Live Photo của iPhone (ảnh tĩnh + đoạn video ngắn cùng tên, 2 file riêng)
+            lẫn Motion Photo của Android (OPPO, Samsung, Pixel...) — thường chỉ 1 file ảnh có
+            kèm video bên trong. Chọn tất cả file cùng lúc, ứng dụng sẽ tự ghép theo tên file và
+            chuyển đổi lần lượt từng cái. File được xử lý tạm trên server và xoá ngay sau khi xử
+            lý xong — nếu ảnh không còn giữ phần video đi kèm/bên trong, phần chuyển động sẽ
+            không còn để trích xuất.
+          </span>
+        </div>
+
+        <div class="form-row">
+          <button type="button" class="btn-paste lp-pick-btn" id="lp-pick-btn">
+            📁 Chọn ảnh/video Live Photo (chọn được nhiều)
+          </button>
+          <input type="file" id="lp-file-input" accept="video/*,image/*,.heic,.heif,.mov" multiple hidden />
+          <div class="btn-group">
+            <button type="button" class="btn-primary" id="lp-convert-btn" disabled>🎬 Chuyển đổi</button>
+          </div>
+        </div>
+
+        <p class="hint" id="lp-group-hint" hidden></p>
+        <div class="lp-filelist" id="lp-filelist"></div>
+
+        <div id="lp-output"></div>
+
+      </section>
+
+    </section>
 
     <footer>
       TikSave · công cụ cá nhân, không lưu trữ nội dung trên server.

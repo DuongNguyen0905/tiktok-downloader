@@ -504,3 +504,209 @@ function renderHistory() {
 if (historyClearBtn) historyClearBtn.addEventListener("click", clearHistory);
 
 renderHistory();
+
+/* ============================================================
+   TABS - chon 1 trong 2 chuc nang (Tai TikTok / Live Photo -> Video)
+   de khong hien ca 2 khoi chuc nang cung luc gay roi mat.
+   ============================================================ */
+
+const TAB_KEY = "tiksave_tab_v1";
+const tabBtnTiktok = document.getElementById("tab-btn-tiktok");
+const tabBtnLivephoto = document.getElementById("tab-btn-livephoto");
+const tabPanelTiktok = document.getElementById("tab-panel-tiktok");
+const tabPanelLivephoto = document.getElementById("tab-panel-livephoto");
+
+function switchTab(tab) {
+  const isTiktok = tab !== "livephoto";
+  tabPanelTiktok.hidden = !isTiktok;
+  tabPanelLivephoto.hidden = isTiktok;
+  tabBtnTiktok.classList.toggle("active", isTiktok);
+  tabBtnLivephoto.classList.toggle("active", !isTiktok);
+  tabBtnTiktok.setAttribute("aria-selected", String(isTiktok));
+  tabBtnLivephoto.setAttribute("aria-selected", String(!isTiktok));
+  try { localStorage.setItem(TAB_KEY, isTiktok ? "tiktok" : "livephoto"); } catch {}
+}
+
+if (tabBtnTiktok) tabBtnTiktok.addEventListener("click", () => switchTab("tiktok"));
+if (tabBtnLivephoto) tabBtnLivephoto.addEventListener("click", () => switchTab("livephoto"));
+
+(function initTab() {
+  if (!tabPanelTiktok || !tabPanelLivephoto) return;
+  let saved = "tiktok";
+  try { saved = localStorage.getItem(TAB_KEY) || "tiktok"; } catch {}
+  switchTab(saved);
+})();
+
+/* ============================================================
+   LIVE PHOTO -> VIDEO (xu ly tren server bang ffmpeg, xem server.js)
+   Nguoi dung co the chon NHIEU Live Photo cung luc - tu ghep file
+   anh + video thanh tung Live Photo theo TEN FILE giong nhau (dung
+   cach iPhone xuat file: IMG_1234.HEIC + IMG_1234.MOV), roi gui
+   LAN LUOT tung Live Photo len server (giong cach xu ly nhieu link
+   TikTok o tren) de khong lam qua tai server free-tier yeu.
+   ============================================================ */
+
+const LP_MAX_FILES = 24; // ~12 Live Photo (anh+video) moi lan chon
+
+const lpPickBtn = document.getElementById("lp-pick-btn");
+const lpFileInput = document.getElementById("lp-file-input");
+const lpConvertBtn = document.getElementById("lp-convert-btn");
+const lpFilelist = document.getElementById("lp-filelist");
+const lpGroupHint = document.getElementById("lp-group-hint");
+const lpOutput = document.getElementById("lp-output");
+
+let lpGroups = []; // [{ name, files: File[] }]
+let lpObjectUrls = [];
+
+// Ghep cac file da chon thanh tung "Live Photo" theo ten file (bo duoi mo rong, khong
+// phan biet hoa/thuong) - day la cach iPhone xuat Live Photo thanh cap 2 file cung ten.
+function groupLivePhotoFiles(files) {
+  const order = [];
+  const map = new Map();
+  files.forEach((file) => {
+    const dot = file.name.lastIndexOf(".");
+    const base = (dot > 0 ? file.name.slice(0, dot) : file.name).toLowerCase();
+    if (!map.has(base)) {
+      map.set(base, { name: dot > 0 ? file.name.slice(0, dot) : file.name, files: [] });
+      order.push(base);
+    }
+    map.get(base).files.push(file);
+  });
+  // Server (multer) chi nhan toi da 2 file/request - neu trung ten hon 2 file (hiem) thi
+  // chi lay 2 file dau, tranh gui thua bi server tu choi ca nhom.
+  return order.map((key) => {
+    const g = map.get(key);
+    return { name: g.name, files: g.files.slice(0, 2) };
+  });
+}
+
+if (lpPickBtn) lpPickBtn.addEventListener("click", () => lpFileInput.click());
+
+if (lpFileInput) {
+  lpFileInput.addEventListener("change", () => {
+    const picked = Array.from(lpFileInput.files || []).slice(0, LP_MAX_FILES);
+    lpGroups = groupLivePhotoFiles(picked);
+    lpFileInput.value = ""; // cho phep chon lai dung file do lan sau neu can
+    renderLpFilelist();
+  });
+}
+
+function renderLpFilelist() {
+  lpFilelist.innerHTML = "";
+  lpGroups.forEach((group, i) => {
+    const chip = document.createElement("div");
+    chip.className = "lp-file-chip";
+
+    const totalSize = group.files.reduce((sum, f) => sum + f.size, 0);
+    const fileNames = group.files.map((f) => f.name).join(" + ");
+
+    const info = document.createElement("span");
+    info.innerHTML = `<b>${escapeHtml(group.name)}</b> · ${escapeHtml(fileNames)} · ${(totalSize / 1048576).toFixed(2)} MB`;
+
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "lp-remove";
+    remove.title = "Bỏ Live Photo này";
+    remove.textContent = "×";
+    remove.addEventListener("click", () => {
+      lpGroups.splice(i, 1);
+      renderLpFilelist();
+    });
+
+    chip.append(info, remove);
+    lpFilelist.appendChild(chip);
+  });
+
+  if (lpGroupHint) {
+    lpGroupHint.hidden = lpGroups.length === 0;
+    lpGroupHint.textContent = lpGroups.length
+      ? `🎞️ Sẽ chuyển đổi ${lpGroups.length} Live Photo (ghép theo tên file trùng nhau).`
+      : "";
+  }
+  lpConvertBtn.disabled = lpGroups.length === 0;
+}
+
+if (lpConvertBtn) lpConvertBtn.addEventListener("click", convertLivePhoto);
+
+async function convertLivePhoto() {
+  if (!lpGroups.length) return;
+
+  lpConvertBtn.disabled = true;
+  const origLabel = lpConvertBtn.textContent;
+  lpOutput.innerHTML = "";
+
+  // Doi batch moi -> giai phong cac blob URL cua lan chuyen doi truoc, tranh ro ri bo nho.
+  lpObjectUrls.forEach((u) => URL.revokeObjectURL(u));
+  lpObjectUrls = [];
+
+  const containers = lpGroups.map((group) => {
+    const div = document.createElement("div");
+    div.className = "status";
+    div.textContent = `⏳ Đang chờ: ${group.name}`;
+    lpOutput.appendChild(div);
+    return div;
+  });
+
+  for (let i = 0; i < lpGroups.length; i++) {
+    lpConvertBtn.textContent = `⏳ Đang xử lý ${i + 1}/${lpGroups.length}...`;
+    await convertOneLivePhotoAndAppend(lpGroups[i], containers[i]);
+  }
+
+  lpConvertBtn.textContent = origLabel;
+  lpConvertBtn.disabled = lpGroups.length === 0;
+}
+
+// Xu ly 1 Live Photo (toi da 2 file) va cap nhat ngay vao `container` cua no trong hang
+// doi - giong fetchOneAndAppend o tren cho TikTok, de 1 Live Photo loi khong anh huong
+// cac Live Photo con lai va co the thu lai rieng tung cai.
+async function convertOneLivePhotoAndAppend(group, container) {
+  container.className = "status";
+  container.textContent = `⏳ Đang xử lý: ${group.name}...`;
+
+  const formData = new FormData();
+  group.files.forEach((file) => formData.append("files", file));
+
+  try {
+    const res = await fetch("/api/live-photo", { method: "POST", body: formData });
+
+    if (!res.ok) {
+      let message = "Chuyển đổi thất bại.";
+      let detail = "";
+      try {
+        const json = await res.json();
+        message = json.error || message;
+        detail = json.detail || "";
+      } catch {
+        // Phan hoi khong phai JSON (vd loi server la): giu thong bao mac dinh.
+      }
+      renderLpItemError(container, group, message, detail);
+      return;
+    }
+
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    lpObjectUrls.push(url);
+
+    const card = document.createElement("div");
+    card.className = "lp-result";
+    card.innerHTML = `
+      <div class="lp-result-name">🎬 ${escapeHtml(group.name)}</div>
+      <video src="${url}" controls playsinline></video>
+      <div class="dl-row">
+        <a class="btn-dl primary" href="${url}" download="${escapeHtml(group.name)}.mp4">⬇ Tải video .mp4</a>
+      </div>`;
+    container.replaceWith(card);
+  } catch (err) {
+    renderLpItemError(container, group, "Lỗi kết nối: " + err.message);
+  }
+}
+
+function renderLpItemError(container, group, message, detail) {
+  container.className = "status error";
+  container.innerHTML = `❌ <b>${escapeHtml(group.name)}</b>: ${escapeHtml(message)}${detail ? `<br><small>${escapeHtml(detail)}</small>` : ""}
+    <div class="status-actions">
+      <button type="button" class="btn-dl-sm retry-one">🔄 Thử lại</button>
+    </div>`;
+  const retryBtn = container.querySelector(".retry-one");
+  if (retryBtn) retryBtn.addEventListener("click", () => convertOneLivePhotoAndAppend(group, container));
+}
